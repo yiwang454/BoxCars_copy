@@ -61,3 +61,56 @@ def download_report_hook(block_num, block_size, total_size):
     sys.stdout.flush()
     if downloaded >= total_size:
         print()
+
+
+def line(p1, p2):
+    A = (p1[1] - p2[1])
+    B = (p2[0] - p1[0])
+    C = (p1[0] * p2[1] - p2[0] * p1[1])
+    return A, B, -C
+
+
+def intersection(L1, L2):
+    D = L1[0] * L2[1] - L1[1] * L2[0]
+    Dx = L1[2] * L2[1] - L1[1] * L2[2]
+    Dy = L1[0] * L2[2] - L1[2] * L2[0]
+    if D != 0:
+        x = Dx / D
+        y = Dy / D
+        return (int(x), int(y))
+    else:
+        return False
+
+
+def get_angle_from_two_points(p1, p2, deg=True):
+    angle = np.arctan((p2[1] - p1[1]) / (1e-3 + (p2[0] - p1[0])))
+    if deg:
+        return angle * 180 / np.pi
+    else:
+        return angle
+
+        
+def cross_from_points(bb3d, img=None):
+    front_lines = [(0, 5, 1, 4), (1, 6, 2, 5), (0, 2, 1, 3)]
+    back_lines = [(3, 6, 2, 7), (3, 4, 0, 7), (4, 6, 5, 7)]
+    colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
+    angles = []
+    for f, b, color in zip(front_lines, back_lines, colors):
+        L1 = line(bb3d[f[0], :], bb3d[f[1], :])
+        L2 = line(bb3d[f[2], :], bb3d[f[3], :])
+        R12 = intersection(L1, L2)
+
+        L3 = line(bb3d[b[0], :], bb3d[b[1], :])
+        L4 = line(bb3d[b[2], :], bb3d[b[3], :])
+        R34 = intersection(L3, L4)
+
+        if img is not None:
+            cv2.line(img, R12, R34, color, 1)
+        angles.append(get_angle_from_two_points(R12, R34))
+
+    if img is not None:
+        return img, angles
+    else:
+        return angles
+
+

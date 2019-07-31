@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 from config import BOXCARS_DATASET,BOXCARS_ATLAS,BOXCARS_CLASSIFICATION_SPLITS
-from utils import load_cache
+from utils import load_cache, cross_from_points
+import _init_paths
+from math import floor
+
 import cv2
 import numpy as np
 
@@ -41,7 +44,9 @@ class BoxCarsDataset(object):
         """
         returns decoded image from atlas in RGB channel order
         """
-        return cv2.cvtColor(cv2.imdecode(self.atlas[vehicle_id][instance_id], 1), cv2.COLOR_BGR2RGB)
+        #image = cv2.cvtColor(cv2.imdecode(self.atlas[vehicle_id][instance_id], 1), cv2.COLOR_BGR2GRAY)
+        image = cv2.cvtColor(cv2.imdecode(self.atlas[vehicle_id][instance_id], 1), cv2.COLOR_BGR2RGB)
+        return cv2.resize(image, (224, 224), interpolation=cv2.INTER_AREA)
         
     #%%
     def get_vehicle_instance_data(self, vehicle_id, instance_id, original_image_coordinates=False):
@@ -73,13 +78,31 @@ class BoxCarsDataset(object):
         for vehicle_id, label in data:
             num_instances = len(self.dataset["samples"][vehicle_id]["instances"])
             x.extend([(vehicle_id, instance_id) for instance_id in range(num_instances)])
-            y.extend([label]*num_instances)
+            in_out = self.dataset["samples"][vehicle_id]['to_camera']
+            if in_out:    #to camera is true: vehicle going out
+                label_inout = 1
+            else:
+                label_inout = 0
+
+
+            #angle as label
+            for i in range(num_instances):
+                instance = self.dataset["samples"][vehicle_id]["instances"][i]
+                bb3d = instance["3DBB"]
+                angles = cross_from_points(bb3d)
+                angle0 = floor(- angles[0] / 3.0) + 30
+                y.append([label_inout, angle0])           
+                        
         self.X[part] = np.asarray(x,dtype=int)
 
         y = np.asarray(y,dtype=int)
-        y_categorical = np.zeros((y.shape[0], self.get_number_of_classes()))
-        y_categorical[np.arange(y.shape[0]), y] = 1
-        self.Y[part] = y_categorical
+
+        '''
+        # initialize label when using angle as label
+        y_categorical = np.zeros((y.shape[0], 61))  # 60 classes: -90 degree to +90 deree divided into 60 bins
+        y_categorical[np.arange(y.shape[0]), y + 30] = 1 # class index starts from 0, angle starts from -90/3
+        '''
+        self.Y[part] = y
         
 
 
@@ -87,25 +110,58 @@ class BoxCarsDataset(object):
         return len(self.split["types_mapping"])
         
         
-    def evaluate(self, probabilities, part="test", top_k=1):
+    def evaluate(self, predictions, part="test", top_k=1):
+
         samples = self.X[part]
-        assert samples.shape[0] == probabilities.shape[0]
-        assert self.get_number_of_classes() == probabilities.shape[1]
+
+        # use with full dats
+        #assert samples.shape[0] == predictions.shape[0]            
+
         part_data = self.split[part]
-        probs_inds = {}
-        for vehicle_id, _ in part_data:
-            probs_inds[vehicle_id] = np.zeros(len(self.dataset["samples"][vehicle_id]["instances"]), dtype=int)
-        for i, (vehicle_id, instance_id) in enumerate(samples):
-            probs_inds[vehicle_id][instance_id] = i
-            
-        get_hit = lambda probs, gt: int(gt in np.argsort(probs.flatten())[-top_k:])
-        hits = []
-        hits_tracks = []
+        
+        hits_directions = []
+        hits_angles = []
+        #hits_tracks = []
+
         for vehicle_id, label in part_data:
-            inds = probs_inds[vehicle_id]
-            hits_tracks.append(get_hit(np.mean(probabilities[inds, :], axis=0), label))
-            for ind in inds:
-                hits.append(get_hit(probabilities[ind, :], label))
-                
-        return np.mean(hits), np.mean(hits_tracks)
+
+            # GROUND TRUTH OF DIRECTIONS
+            in_out = self.dataset["samples"][vehicle_id]['to_camera']
+            if in_out:    #to camera is true: vehicle going out
+                label_inout = 1
+            else:
+                label_inout = 0
+            print("label_inout", label_inout)
+
+            #############
+
+            # how well prediction worked over the track
+            # hits_tracks.append(get_hit(np.mean(predictions[index_of_sample, :], axis=0), label_inout))
+            # p.mean(predictions[index_of_sample, :], axis=0), label_inout
+            # hits_tracks.append(get_hit())
+
+            #GROUND TRUTH OF ANGLES
+            for instance_id in range(len(self.dataset["samples"][vehicle_id]["instances"])):
+
+                instance = self.dataset["samples"][vehicle_id]["instances"][instance_id]
+                bb3d = instance["3DBB"]
+                angles = cross_from_points(bb3d)
+                angle0 = floor(- angles[0] / 3.0) + 30
+
+                # how well prediction worked on sample by sample basis
+                prediction_d = int(predictions[vehicle_id][instance_id]['output_d']) #need to modify according to new predictions data structure
+                prediction_a = int(predictions[vehicle_id][instance_id]['output_a'])
+
+                if prediction_d == label_inout:
+                    hits_directions.append(1.0)
+                else:
+                    hits_directions.append(0.0)
+
+                if prediction_a == angle0:
+                    hits_angles.append(1.0)
+                else:
+                    hits_angles.append(0.0)
+
+        #need to add a return about angle
+        return np.mean(hits_directions), np.mean(hits_angles) #, np.mean(hits_tracks)
         
