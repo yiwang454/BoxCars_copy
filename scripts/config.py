@@ -2,7 +2,7 @@
 import os
 #%%
 # change this to your location
-BOXCARS_DATASET_ROOT = "/mnt/matylda1/isochor/Datasets/BoxCars116k/" 
+BOXCARS_DATASET_ROOT = "/home/vivacityserver6/datasets/BoxCars116k/" 
 
 #%%
 BOXCARS_IMAGES_ROOT = os.path.join(BOXCARS_DATASET_ROOT, "images")
