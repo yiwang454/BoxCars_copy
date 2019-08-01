@@ -37,7 +37,7 @@ def save_one_img_prediction(img_name, predictions):
         file.write(predictions)
 
 
-def predictions_for_whole_dataset(model_path, image, img_name):
+def predictions_for_img(model, image, img_name):
     '''
     input: path of the trained model, a txt file that contain the name of all images
     return: prediction of direction of the car: 
@@ -48,17 +48,12 @@ def predictions_for_whole_dataset(model_path, image, img_name):
                 predictions = {'output_d': , 'output_a': }
     '''
 
-    predictions = {}
-    MODEL = load_model(model_path)
-
     # read and preprocess img
     image_pro = (image.astype(np.float32) - 116)/128.
-    image_predict = cv2.resize(image_pro, (100, 100), interpolation=cv2.INTER_AREA)
+    image_predict = cv2.resize(image_pro, (224, 224), interpolation=cv2.INTER_AREA)
     image_predict.resize((1, image_predict.shape[0],image_predict.shape[1], image_predict.shape[2]))
 
     print(model.predict_on_batch(image_predict))
-
-    prediction = model.predict_on_batch(image)
 
     prediction_ints = {}
     for label in range(len(prediction)):

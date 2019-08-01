@@ -8,7 +8,7 @@ from boxcars_dataset import BoxCarsDataset
 from boxcars_data_generator import BoxCarsDataGenerator
 
 
-model_path = '/home/vivacityserver6/repos/BoxCars/model_epoch6_direction_angle.h5'
+model_path = '/home/vivacityserver6/repos/BoxCars/cache/snapshot/model_008.h5'
 prediction_saved_path = '/home/vivacityserver6/repos/BoxCars/scripts/predictions_file_with_angle.json'
 batch_size = 1
 
