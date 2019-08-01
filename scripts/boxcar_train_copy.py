@@ -13,10 +13,6 @@ from keras.callbacks import ModelCheckpoint, TensorBoard
 
 import matplotlib.pyplot as plt
 
-def assigning_evaluation_value(eval_list):
-    key_list = ['loss', 'd_loss', 'a_loss', 'd_acc', 'a_acc']
-    return dict(zip(key_list, eval_list))
-
 batch_size = 128
 epochs = 15
 epoch_period = 1
@@ -213,12 +209,13 @@ for training_loop in range(epochs // epoch_period):
     # val_evaluation = model.evaluate_generator(generator_val, verbose=1)
     # print('val_eval: ', val_evaluation)
     # val_evaluations[current_epoch] = assigning_evaluation_value(val_evaluation)
-
+'''
 total_eval = {}
 total_eval['train'] = train_evaluations
 total_eval['val'] = val_evaluations
 total_eval['test'] = test_evaluations
-    
+'''
+ 
 model.save('./model_test_epoch{}_direction_angle.h5'.format(epochs))
 
 with open('./loss_acc.json', 'w') as file:
