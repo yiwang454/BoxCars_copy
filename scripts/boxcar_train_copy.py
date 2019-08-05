@@ -9,18 +9,110 @@ from boxcars_data_generator import BoxCarsDataGenerator
 import keras
 from keras.models import Sequential, Model
 from keras.layers import Input, Dense, Activation,Conv2D, MaxPooling2D, BatchNormalization, Flatten, LeakyReLU
+from keras.applications.resnet50 import ResNet50
 from keras.callbacks import ModelCheckpoint, TensorBoard
 
 import matplotlib.pyplot as plt
 
-batch_size = 128
+batch_size = 64
 epochs = 15
 epoch_period = 1
 direction_number = 2
 angle_bin_number = 60
 input_shape = (224, 224, 3)
 estimated_3DBB = None
+using_VGG = False
+using_resnet = True
 cache = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "cache"))
+snapshots_file = "model_60bins_resnet_{epoch:03d}.h5"
+fig_file = "./loss_acc_60bins_resnet.png"
+
+def VGG_model():
+    model_main = Sequential()
+    model_main.add(Conv2D(32, kernel_size=(3, 3), activation='linear', input_shape=input_shape))
+
+    model_main.add(LeakyReLU(alpha=0.1))
+    model_main.add(BatchNormalization())
+    model_main.add(MaxPooling2D(pool_size=(2, 2)))
+
+    model_main.add(Conv2D(64, (3, 3), activation='linear'))
+    model_main.add(LeakyReLU(alpha=0.1))
+    model_main.add(BatchNormalization())
+    model_main.add(MaxPooling2D(pool_size=(2, 2)))
+
+    model_main.add(Conv2D(128, (3, 3), activation='linear'))
+    model_main.add(LeakyReLU(alpha=0.1))
+    model_main.add(BatchNormalization())
+
+    model_main.add(Conv2D(64, (1, 1), activation='linear'))
+    model_main.add(LeakyReLU(alpha=0.1))
+    model_main.add(BatchNormalization())
+
+    model_main.add(Conv2D(128, (3, 3), activation='linear'))
+    model_main.add(LeakyReLU(alpha=0.1))
+    model_main.add(BatchNormalization())
+    model_main.add(MaxPooling2D(pool_size=(2, 2)))
+
+    #----------
+
+    model_main.add(Conv2D(256, (3, 3), activation='linear'))
+    model_main.add(LeakyReLU(alpha=0.1))
+    model_main.add(BatchNormalization())
+
+    model_main.add(Conv2D(128, (1, 1), activation='linear'))
+    model_main.add(LeakyReLU(alpha=0.1))
+    model_main.add(BatchNormalization())
+
+    model_main.add(Conv2D(256, (3, 3), activation='linear'))
+    model_main.add(LeakyReLU(alpha=0.1))
+    model_main.add(BatchNormalization())
+    model_main.add(MaxPooling2D(pool_size=(2, 2)))
+
+    #----------
+
+    model_main.add(Conv2D(512, (3, 3), activation='linear'))
+    model_main.add(LeakyReLU(alpha=0.1))
+    model_main.add(BatchNormalization())
+
+    model_main.add(Conv2D(256, (1, 1), activation='linear'))
+    model_main.add(LeakyReLU(alpha=0.1))
+    model_main.add(BatchNormalization())
+
+    model_main.add(Conv2D(512, (3, 3), activation='linear'))
+    model_main.add(LeakyReLU(alpha=0.1))
+    model_main.add(BatchNormalization())
+
+    model_main.add(Conv2D(256, (1, 1), activation='linear'))
+    model_main.add(LeakyReLU(alpha=0.1))
+    model_main.add(BatchNormalization())
+
+    model_main.add(Conv2D(512, (3, 3), activation='linear'))
+    model_main.add(LeakyReLU(alpha=0.1))
+    model_main.add(BatchNormalization())
+    model_main.add(MaxPooling2D(pool_size=(2, 2)))
+
+    #----------
+    
+    # model_main.add(Conv2D(1024, (3, 3), activation='linear'))
+    # model_main.add(LeakyReLU(alpha=0.1))
+    # model_main.add(BatchNormalization())
+
+    # model_main.add(Conv2D(512, (1, 1), activation='linear'))
+    # model_main.add(LeakyReLU(alpha=0.1))
+    # model_main.add(BatchNormalization())
+
+    # model_main.add(Conv2D(1024, (3, 3), activation='linear'))
+    # model_main.add(LeakyReLU(alpha=0.1))
+    # model_main.add(BatchNormalization())
+
+    # model_main.add(Conv2D(512, (1, 1), activation='linear'))
+    # model_main.add(LeakyReLU(alpha=0.1))
+    # model_main.add(BatchNormalization())
+
+    # model_main.add(Conv2D(1024, (3, 3), activation='linear'))
+    # model_main.add(LeakyReLU(alpha=0.1))
+    # model_main.add(BatchNormalization())
+    return model_main
 
 if estimated_3DBB is None:
     dataset = BoxCarsDataset(load_split='hard', load_atlas=True)
@@ -28,104 +120,29 @@ else:
     dataset = BoxCarsDataset(load_split='hard', load_atlas=True, 
                              use_estimated_3DBB = True, estimated_3DBB_path = estimated_3DBB)
 
-output_final_model_path = os.path.join(cache, "final_model.h5")
 snapshots_dir = os.path.join(cache, "snapshots")
 tensorboard_dir = os.path.join(cache, "tensorboard")
 
 ###build training model
 
-main_input = Input(shape = input_shape, name='main_input')
 
-model_main = Sequential()
-model_main.add(Conv2D(32, kernel_size=(3, 3), activation='linear', input_shape=input_shape))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-model_main.add(MaxPooling2D(pool_size=(2, 2)))
 
-model_main.add(Conv2D(64, (3, 3), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-model_main.add(MaxPooling2D(pool_size=(2, 2)))
+if using_VGG:
+    main_input = Input(shape = input_shape, name='main_input')
+    model_main = VGG_model()
+    x = model_main(main_input)
+elif using_resnet:
+    model_main = ResNet50(weights='imagenet', include_top=False, input_shape=(224,224,3))
+    x = Flatten()(model_main.output)
+    
 
-model_main.add(Conv2D(128, (3, 3), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-
-model_main.add(Conv2D(64, (1, 1), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-
-model_main.add(Conv2D(128, (3, 3), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-model_main.add(MaxPooling2D(pool_size=(2, 2)))
-
-#----------
-
-model_main.add(Conv2D(256, (3, 3), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-
-model_main.add(Conv2D(128, (1, 1), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-
-model_main.add(Conv2D(256, (3, 3), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-model_main.add(MaxPooling2D(pool_size=(2, 2)))
-
-#----------
-
-model_main.add(Conv2D(512, (3, 3), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-
-model_main.add(Conv2D(256, (1, 1), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-
-model_main.add(Conv2D(512, (3, 3), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-
-model_main.add(Conv2D(256, (1, 1), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-
-model_main.add(Conv2D(512, (3, 3), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-model_main.add(MaxPooling2D(pool_size=(2, 2)))
-
-#----------
-'''
-model_main.add(Conv2D(1024, (3, 3), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-
-model_main.add(Conv2D(512, (1, 1), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-
-model_main.add(Conv2D(1024, (3, 3), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-
-model_main.add(Conv2D(512, (1, 1), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-
-model_main.add(Conv2D(1024, (3, 3), activation='linear'))
-model_main.add(LeakyReLU(alpha=0.1))
-model_main.add(BatchNormalization())
-'''
-model_main.add(Flatten())
-
-x = model_main(main_input)
 direction_output = Dense(direction_number, activation = 'softmax', name='output_d')(x)
 angle_output = Dense(angle_bin_number, activation = 'softmax', name='output_a')(x)
-model = Model(inputs=main_input, outputs=[direction_output, angle_output])
+if using_VGG:
+    model = Model(inputs=main_input, outputs=[direction_output, angle_output])
+
+elif using_resnet:
+    model = Model(inputs=model_main.input, outputs=[direction_output, angle_output])
 
 model.compile(loss=keras.losses.sparse_categorical_crossentropy,
               optimizer=keras.optimizers.Adadelta(),
@@ -140,15 +157,11 @@ dataset.initialize_data("validation")
 generator_train = BoxCarsDataGenerator(dataset, "train", batch_size, training_mode=True)
 generator_val = BoxCarsDataGenerator(dataset, "validation", batch_size, training_mode=False)
 
-#initialize dataset for testing
-dataset.initialize_data('test')
-generator_test = BoxCarsDataGenerator(dataset, "test", batch_size = 1, training_mode=False)
-
 #%% callbacks
 ensure_dir(tensorboard_dir)
 ensure_dir(snapshots_dir)
 tb_callback = TensorBoard(tensorboard_dir, histogram_freq=0, write_graph=True, write_images=True)
-saver_callback = ModelCheckpoint(os.path.join(snapshots_dir, "model_test_{epoch:03d}.h5"), period=3)
+saver_callback = ModelCheckpoint(os.path.join(snapshots_dir, snapshots_file), period=2)
 
 
 print(dataset.X['train'].shape)
@@ -193,7 +206,7 @@ for training_loop in range(epochs // epoch_period):
     plt.legend(['output_a_loss', 'output_a_acc', 'val_output_a_loss', 'val_output_a_acc'])
     plt.xlabel('Epochs')
     plt.ylabel('loss and accuracy')
-    plt.savefig('./loss_acc_image.png')
+    plt.savefig(fig_file)
     
     # compute and save loss and accuracy on training set
     # train_evaluation = model.evaluate_generator(generator_train, steps=generator_train.n // batch_size, verbose=1)
@@ -216,12 +229,13 @@ total_eval['val'] = val_evaluations
 total_eval['test'] = test_evaluations
 '''
  
-model.save('./model_test_epoch{}_direction_angle.h5'.format(epochs))
-
-with open('./loss_acc.json', 'w') as file:
-    json.dump(total_eval, file, separators=(',', ':'), indent = 4)
+model.save('./model_60bins_resnet_epoch{}_direction_angle.h5'.format(epochs))
 
 '''
+with open('./loss_acc_6bins_resnet.json', 'w') as file:
+    json.dump(total_eval, file, separators=(',', ':'), indent = 4)
+
+
 #%% evaluate the model 
 print("Running evaluation...")
 dataset.initialize_data('test')

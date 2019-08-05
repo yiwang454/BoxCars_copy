@@ -3,8 +3,7 @@ import cv2
 import os
 import json
 from math import tan, pi
-from visualize import predictions_for_img
-from keras.models import load_model
+
 
 dir = 'cropped_img'
 try:
@@ -34,15 +33,16 @@ OUTPUT_PATH = os.path.join(BOXCAR_FOLDER, 'output')
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 PATH_VIDEO = os.path.join(PATH_VIDEO_FOLDER,'test_3.mp4')
 MODEL_PATH = '/home/vivacityserver6/repos/BoxCars/cache/snapshots/model_test_003.h5'
+PATH_JSON = '/home/vivacityserver6/repos/BoxCars/output/prediction.json'
 
 
 
-# def crop_and_save(img_name, image, save):
-# 	image_crop = image[y:y+height, x:x+width]
-# 	if save == True:
-#     	img_name = os.path.join(OUTPUT_PATH, 'cropped_img', img_name) + '.png'
-# 		cv2.imwrite(img_name, image_crop)
-# 	return image_crop
+def crop_and_save(img_name, image):
+	if not os.path.exists(os.path.join(OUTPUT_PATH, 'cropped_img')):
+		os.mkdir(os.path.join(OUTPUT_PATH, 'cropped_img'))
+	img_name = os.path.join(OUTPUT_PATH, 'cropped_img', img_name) + '.png'
+	cv2.imwrite(img_name, image)
+	return image
 
 
 def read_bbox(path_csv):
@@ -60,8 +60,7 @@ def read_direction(path_json):
 		direction_dict = json.load(json_file)
 		return direction_dict
 
-def analyse_video():
-	model = load_model(MODEL_PATH)
+def analyse_video(cropping_img):
 
 	vidcap = cv2.VideoCapture(PATH_VIDEO)
 
@@ -83,34 +82,33 @@ def analyse_video():
 				width = int(line[4])
 				height = int(line[5])
 				class_label = class_dict[line[6]]
-
-				#img_name = '_'.join([str(frame_count), str(img_count), class_label])
-
-				#img_cropped = crop_and_save(img_name, image, SAVE_CROPPED_IMG)
+				
+				img_name = '_'.join([str(frame_count), str(img_count), class_label])
 				img_cropped = image[y:y+height, x:x+width]
-				prediction = predictions_for_img(model, image)
+				if cropping_img:
+    					
+    					crop_and_save(img_name, img_cropped)
 				
-				directions_predictions = prediction[0].tolist()[0]
-				direction = directions_predictions.index(max(directions_predictions))
-				angle_predictions = prediction[1].tolist()[0]
-				angle = angle_predictions.index(max(angle_predictions)) - 30
-				
-				left_point = (round(x), round(y + height/2 - width/2 * tan(angle * pi / 180)))
-				right_point = (round(x+width), round(y + height/2 + width/2 * tan(angle * pi / 180)))
-				if direction == 1:
-					text = 'to_camera'
-					cv2.rectangle(image,(x, y), (x+width, y+height),(0,0,255),3)	# draw green box for 2D bbox
-					cv2.line(image, left_point, right_point, (0,0,255),3)	# draw green box for 2D bbox
-					cv2.putText(image, text ,(x, y), FONT, 1, (0,0,255), 2, cv2.LINE_AA)
 				else:
-					text = 'from_camera'
-					cv2.rectangle(image,(x, y), (x+width, y+height),(0,255,0),3)	# draw green box for 2D bbox
-					cv2.line(image, left_point, right_point, (0,255,0),3)	# draw green box for 2D bbox
-					cv2.putText(image, text ,(x, y), FONT, 1, (0,255,0), 2, cv2.LINE_AA)
-				
-				cv2.imshow('frame', image)
-				if cv2.waitKey(20) & 0xFF == ord('q'):
-					break
+					predictions = read_direction(PATH_JSON)
+					
+					directions_predictions = predictions[img_name]['output_a']
+					direction = directions_predictions.index(max(directions_predictions))
+					angle_predictions = predictions[img_name]['output_d']
+					angle = (angle_predictions.index(max(angle_predictions)) - 3) * 30
+					
+					left_point = (round(x), round(y + height/2 + width/2 * tan(angle * pi / 180)))
+					right_point = (round(x+width), round(y + height/2 - width/2 * tan(angle * pi / 180)))
+					if direction == 1:
+						text = 'to_camera'
+						cv2.rectangle(image,(x, y), (x+width, y+height),(0,0,255),3)	# draw green box for 2D bbox
+						cv2.line(image, left_point, right_point, (0,0,255),3)	# draw green box for 2D bbox
+						cv2.putText(image, text ,(x, y), FONT, 1, (0,0,255), 2, cv2.LINE_AA)
+					else:
+						text = 'from_camera'
+						cv2.rectangle(image,(x, y), (x+width, y+height),(0,255,0),3)	# draw green box for 2D bbox
+						cv2.line(image, left_point, right_point, (0,255,0),3)	# draw green box for 2D bbox
+						cv2.putText(image, text ,(x, y), FONT, 1, (0,255,0), 2, cv2.LINE_AA)
 
 				img_count += 1
 
@@ -118,13 +116,17 @@ def analyse_video():
 				#print('>')	#debugging purpose
 				frame_count += 1
 				break
-	
+
+		cv2.imshow('frame', image)
+		if cv2.waitKey(20) & 0xFF == ord('q'):
+			break
+
 	vidcap.release()
 	cv2.destroyAllWindows()
 
 
 def main():
-	analyse_video()
+	analyse_video(False)
 
 if __name__ == '__main__':
     main()
