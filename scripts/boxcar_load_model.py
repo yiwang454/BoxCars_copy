@@ -1,6 +1,7 @@
 import keras
 import numpy as np
 import json
+import os
 import _init_paths
 from keras.models import load_model
 
@@ -8,9 +9,11 @@ from boxcars_dataset import BoxCarsDataset
 from boxcars_data_generator import BoxCarsDataGenerator
 
 
-model_path = '/home/vivacityserver6/repos/BoxCars/cache/snapshot/model_008.h5'
+model_path = '/home/vivacityserver6/repos/BoxCars/cache/snapshot/model_008.h5'    #need to modify
 prediction_saved_path = '/home/vivacityserver6/repos/BoxCars/scripts/predictions_file_with_angle.json'
-batch_size = 1
+OUTPUT_PATH = '/home/vivacityserver6/repos/BoxCars/output/'
+batch_size = 64
+part_size = 64
 
 model = load_model(model_path)
 estimated_3DBB = None
@@ -66,22 +69,13 @@ def predictions_for_whole_dataset(model, dataset):
 
     return predictions
 
-if estimated_prediction == False:
-    predictions = predictions_for_whole_dataset(model, dataset)
-    print(len(predictions.items()))
+def visualize_prediction_part(predictions):
+    for idx, item in predictions.items():
+        if idx < part_size:
 
-else:
-    with open(prediction_saved_path, 'r') as json_file:
-        predictions = json.load(json_file)
-        print(type(predictions))
+            #create a folder to save output
+            if not os.path.exists(os.path.join(OUTPUT_PATH, 'boxcar_test_visualize')):
+                os.mkdir(os.path.join(OUTPUT_PATH, 'boxcar_test_visualize'))
 
-'''
-for idx, item in enumerate(predictions.items()):
-    if key < 10:
-        print(key, item)
-print(predictions[3117])
-'''
-
-hits_directions, hits_angles = dataset.evaluate(predictions)
-print(" -- Accuracy: %.2f%%"%(hits_directions*100))
-print(" -- hits_angles: %.2f%%"%(hits_angles*100))
+            
+        

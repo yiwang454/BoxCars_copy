@@ -7,7 +7,7 @@ from keras.models import load_model
 from boxcars_dataset import BoxCarsDataset
 from boxcars_data_generator import BoxCarsDataGenerator
 
-model_path = '/home/vivacityserver6/repos/BoxCars/cache/snapshots/model_6bins_resnet_003.h5'
+model_path = '/home/vivacityserver6/repos/BoxCars/cache/snapshots/model_60bins_resnet_002.h5'
 prediction_saved_path = '/home/vivacityserver6/repos/BoxCars/scripts/predictions_file_with_angle.json'
 batch_size = 64
 

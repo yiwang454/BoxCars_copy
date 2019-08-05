@@ -34,6 +34,7 @@ class BoxCarsDataGenerator(Iterator):
 
         for i, ind in enumerate(index_array):
             vehicle_id, instance_id = self.dataset.X[self.part][ind]
+            '''
             if vehicle_id in self.check_repeatation.keys():
                 if instance_id in self.check_repeatation[vehicle_id].keys():
                     self.check_repeatation[vehicle_id][instance_id] += 1
@@ -41,7 +42,7 @@ class BoxCarsDataGenerator(Iterator):
                     self.check_repeatation[vehicle_id][instance_id] = 0
             else:
                 self.check_repeatation[vehicle_id] = {}
-
+            '''
             vehicle, instance, bb3d = self.dataset.get_vehicle_instance_data(vehicle_id, instance_id)
             image = self.dataset.get_image(vehicle_id, instance_id)
             if self.training_mode:
@@ -58,5 +59,5 @@ class BoxCarsDataGenerator(Iterator):
         if not self.generate_y:
             return x
 
-        return x, {'output_d': y1, 'output_a': y2}
+        return (x, {'output_d': y1, 'output_a': y2})
 
