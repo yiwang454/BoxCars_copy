@@ -3,6 +3,7 @@ import pickle
 import os
 import numpy as np
 import sys
+from math import floor
 
 #%%
 def load_cache(path, encoding="latin-1", fix_imports=True):
@@ -113,4 +114,8 @@ def cross_from_points(bb3d, img=None):
     else:
         return angles
 
+def get_true_angle(bb3d):
+    angles = cross_from_points(bb3d)
+    angle0 = floor(- angles[0] / 3.0) + 30
+    return angle0
 

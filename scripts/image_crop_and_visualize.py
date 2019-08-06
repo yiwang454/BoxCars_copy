@@ -92,9 +92,9 @@ def analyse_video(cropping_img):
 				else:
 					predictions = read_direction(PATH_JSON)
 					
-					directions_predictions = predictions[img_name]['output_a']
+					directions_predictions = predictions[img_name]['output_d']
 					direction = directions_predictions.index(max(directions_predictions))
-					angle_predictions = predictions[img_name]['output_d']
+					angle_predictions = predictions[img_name]['output_a']
 					angle = (angle_predictions.index(max(angle_predictions)) - 3) * 30
 					
 					left_point = (round(x), round(y + height/2 + width/2 * tan(angle * pi / 180)))

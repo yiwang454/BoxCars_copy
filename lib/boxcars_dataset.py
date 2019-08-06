@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 from config import BOXCARS_DATASET,BOXCARS_ATLAS,BOXCARS_CLASSIFICATION_SPLITS
-from utils import load_cache, cross_from_points
+from utils import load_cache, cross_from_points, get_true_angle
 import _init_paths
-from math import floor
 
 import cv2
 import numpy as np
@@ -89,8 +88,7 @@ class BoxCarsDataset(object):
             for i in range(num_instances):
                 instance = self.dataset["samples"][vehicle_id]["instances"][i]
                 bb3d = instance["3DBB"]
-                angles = cross_from_points(bb3d)
-                angle0 = floor(- angles[0] / 3.0) + 30
+                angle0 = get_true_angle(bb3d)
                 y.append([label_inout, angle0])           
                         
         self.X[part] = np.asarray(x,dtype=int)
@@ -145,8 +143,7 @@ class BoxCarsDataset(object):
 
                 instance = self.dataset["samples"][vehicle_id]["instances"][instance_id]
                 bb3d = instance["3DBB"]
-                angles = cross_from_points(bb3d)
-                angle0 = floor(- angles[0] / 3.0) + 30
+                angle0 = get_true_angle(bb3d)
 
                 # how well prediction worked on sample by sample basis
                 prediction_d = int(predictions[vehicle_id][instance_id]['output_d']) #need to modify according to new predictions data structure
