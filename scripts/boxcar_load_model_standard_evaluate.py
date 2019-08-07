@@ -7,7 +7,7 @@ from keras.models import load_model
 from boxcars_dataset import BoxCarsDataset
 from boxcars_data_generator import BoxCarsDataGenerator
 
-model_path = '/home/vivacityserver6/repos/BoxCars/cache/snapshots/model_60bins_resnet_002.h5'
+model_path = '/home/vivacityserver6/repos/BoxCars/cache/snapshots/model_3angles_60bins_resnet_008.h5'
 prediction_saved_path = '/home/vivacityserver6/repos/BoxCars/scripts/predictions_file_with_angle.json'
 batch_size = 64
 
@@ -15,7 +15,7 @@ estimated_3DBB = None
 estimated_prediction = False
 
 def assigning_evaluation_value(eval_list):
-    key_list = ['loss', 'd_loss', 'a_loss', 'd_acc', 'a_acc']
+    key_list = ['loss', 'd_loss', 'a0_loss', 'a1_loss', 'a2_loss', 'd_acc', 'a0_acc', 'a1_acc', 'a2_acc']
     return dict(zip(key_list, eval_list))
 
 def evaluation_for_whole_dataset(model, dataset_generator, batch_size):

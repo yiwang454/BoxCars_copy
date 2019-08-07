@@ -19,13 +19,14 @@ epochs = 15
 epoch_period = 1
 direction_number = 2
 angle_bin_number = 60
+angle_number = 3
 input_shape = (224, 224, 3)
 estimated_3DBB = None
 using_VGG = False
 using_resnet = True
 cache = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "cache"))
-snapshots_file = "model_60bins_resnet_{epoch:03d}.h5"
-fig_file = "./loss_acc_60bins_resnet.png"
+snapshots_file = "model_3angles_60bins_resnet_{epoch:03d}.h5"
+fig_file = "./loss_acc_3angles_60bins_resnet.png"
 
 def VGG_model():
     model_main = Sequential()
@@ -135,14 +136,17 @@ elif using_resnet:
     model_main = ResNet50(weights='imagenet', include_top=False, input_shape=(224,224,3))
     x = Flatten()(model_main.output)
     
-
 direction_output = Dense(direction_number, activation = 'softmax', name='output_d')(x)
-angle_output = Dense(angle_bin_number, activation = 'softmax', name='output_a')(x)
+
+angle_0_output = Dense(angle_bin_number, activation = 'softmax', name='output_a0')(x)
+angle_1_output = Dense(angle_bin_number, activation = 'softmax', name='output_a1')(x)
+angle_2_output = Dense(angle_bin_number, activation = 'softmax', name='output_a2')(x)
+
 if using_VGG:
-    model = Model(inputs=main_input, outputs=[direction_output, angle_output])
+    model = Model(inputs=main_input, outputs=[direction_output, angle_0_output, angle_1_output, angle_2_output])
 
 elif using_resnet:
-    model = Model(inputs=model_main.input, outputs=[direction_output, angle_output])
+    model = Model(inputs=model_main.input, outputs=[direction_output, angle_0_output, angle_1_output, angle_2_output])
 
 model.compile(loss=keras.losses.sparse_categorical_crossentropy,
               optimizer=keras.optimizers.Adadelta(),
@@ -163,18 +167,13 @@ ensure_dir(snapshots_dir)
 tb_callback = TensorBoard(tensorboard_dir, histogram_freq=0, write_graph=True, write_images=True)
 saver_callback = ModelCheckpoint(os.path.join(snapshots_dir, snapshots_file), period=2)
 
-
-print(dataset.X['train'].shape)
-print(dataset.X['validation'].shape)
-print(generator_train.n)
-print(generator_val.n)
-
 current_epoch = 0
 
-output_a_loss = []
-output_a_acc = []
-val_output_a_loss = []
-val_output_a_acc = []
+output_angle_loss = [[] for _ in range(angle_number)]
+output_angle_acc = [[] for _ in range(angle_number)]
+val_output_angle_loss = [[] for _ in range(angle_number)]
+val_output_angle_acc = [[] for _ in range(angle_number)]
+
 epochs_list = []
 
 
@@ -193,35 +192,35 @@ for training_loop in range(epochs // epoch_period):
     print(history)
     current_epoch += epoch_period
     epochs_list.append(current_epoch)
-    output_a_loss.extend(history['output_a_loss'])
-    output_a_acc.extend(history['output_a_acc'])
-    val_output_a_loss.extend(history['val_output_a_loss'])
-    val_output_a_acc.extend(history['val_output_a_acc'])
+    for i, angle_loss in enumerate(output_angle_loss):
+        key = 'output_a{}_loss'.format(i)
+        angle_loss.extend(history[key])
 
-    plt.plot(epochs_list, output_a_loss, 'r--')
-    plt.plot(epochs_list, output_a_acc, 'r-')
-    plt.plot(epochs_list, val_output_a_loss, 'b--')
-    plt.plot(epochs_list, val_output_a_acc, 'b-')
-    plt.xlim(0, epochs)
-    plt.legend(['output_a_loss', 'output_a_acc', 'val_output_a_loss', 'val_output_a_acc'])
-    plt.xlabel('Epochs')
-    plt.ylabel('loss and accuracy')
+    for i, angle_acc in enumerate(output_angle_acc):
+        key = 'output_a{}_acc'.format(i)
+        angle_acc.extend(history[key])
+
+    for i, val_angle_loss in enumerate(val_output_angle_loss):
+        key = 'val_output_a{}_loss'.format(i)
+        val_angle_loss.extend(history[key])
+
+    for i, val_angle_acc in enumerate(val_output_angle_acc):
+        key = 'val_output_a{}_acc'.format(i)
+        val_angle_acc.extend(history[key])
+
+    for i in range(angle_number):
+        plt.subplot(1, angle_number, i + 1)
+        plt.plot(epochs_list, output_angle_loss[i], 'r--')
+        plt.plot(epochs_list, output_angle_acc[i], 'r-')
+        plt.plot(epochs_list, val_output_angle_loss[i], 'b--')
+        plt.plot(epochs_list, val_output_angle_acc[i], 'b-')
+        plt.xlim(0, epochs)
+        plt.legend(['output_a{}_loss'.format(i), 'output_a{}_acc'.format(i), 'val_output_a{}_loss'.format(i), 'val_output_a{}_acc'.format(i)])
+        plt.xlabel('Epochs')
+        plt.ylabel('loss and accuracy')
     plt.savefig(fig_file)
-    
-    # compute and save loss and accuracy on training set
-    # train_evaluation = model.evaluate_generator(generator_train, steps=generator_train.n // batch_size, verbose=1)
-    # print('train_eval: ', train_evaluation)
-    # train_evaluations[current_epoch] = assigning_evaluation_value(train_evaluation)
-    # train_evaluation = model.evaluate_generator(generator_train, steps=generator_train.n // batch_size, verbose=1)
-    # print('train_eval: ', train_evaluation)
-    # train_evaluations[current_epoch] = assigning_evaluation_value(train_evaluation)
-    # # compute and save loss and accuracy on test set
-    # test_evaluation = model.evaluate_generator(generator_test, steps=generator_test.n // batch_size, verbose=1)
-    # print('test_eval: ', test_evaluation)
-    # test_evaluations[current_epoch] = assigning_evaluation_value(test_evaluation)
-    # val_evaluation = model.evaluate_generator(generator_val, verbose=1)
-    # print('val_eval: ', val_evaluation)
-    # val_evaluations[current_epoch] = assigning_evaluation_value(val_evaluation)
+        
+
 '''
 total_eval = {}
 total_eval['train'] = train_evaluations
@@ -229,7 +228,7 @@ total_eval['val'] = val_evaluations
 total_eval['test'] = test_evaluations
 '''
  
-model.save('./model_60bins_resnet_epoch{}_direction_angle.h5'.format(epochs))
+model.save('./model_3angles_60bins_resnet_epoch{}_direction_angle.h5'.format(epochs))
 
 '''
 with open('./loss_acc_6bins_resnet.json', 'w') as file:

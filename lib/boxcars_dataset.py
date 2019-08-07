@@ -88,8 +88,8 @@ class BoxCarsDataset(object):
             for i in range(num_instances):
                 instance = self.dataset["samples"][vehicle_id]["instances"][i]
                 bb3d = instance["3DBB"]
-                angle0 = get_true_angle(bb3d)
-                y.append([label_inout, angle0])           
+                angles = get_true_angle(bb3d)
+                y.append([label_inout] + angles)           
                         
         self.X[part] = np.asarray(x,dtype=int)
 
@@ -143,18 +143,21 @@ class BoxCarsDataset(object):
 
                 instance = self.dataset["samples"][vehicle_id]["instances"][instance_id]
                 bb3d = instance["3DBB"]
-                angle0 = get_true_angle(bb3d)
+                angles = get_true_angle(bb3d)
 
                 # how well prediction worked on sample by sample basis
                 prediction_d = int(predictions[vehicle_id][instance_id]['output_d']) #need to modify according to new predictions data structure
-                prediction_a = int(predictions[vehicle_id][instance_id]['output_a'])
+                prediction_a0 = int(predictions[vehicle_id][instance_id]['output_a0'])
+                prediction_a1 = int(predictions[vehicle_id][instance_id]['output_a1'])
+                prediction_a2 = int(predictions[vehicle_id][instance_id]['output_a2'])
+
 
                 if prediction_d == label_inout:
                     hits_directions.append(1.0)
                 else:
                     hits_directions.append(0.0)
 
-                if prediction_a == angle0:
+                if prediction_a0 == angles[0]:
                     hits_angles.append(1.0)
                 else:
                     hits_angles.append(0.0)

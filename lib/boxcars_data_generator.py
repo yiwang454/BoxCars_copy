@@ -31,6 +31,8 @@ class BoxCarsDataGenerator(Iterator):
         x = np.empty([self.batch_size] + list(self.image_size) + [3], dtype=np.float32)
         y1 = np.empty([self.batch_size] + [1], dtype=np.float32)
         y2 = np.empty([self.batch_size] + [1], dtype=np.float32)
+        y3 = np.empty([self.batch_size] + [1], dtype=np.float32)
+        y4 = np.empty([self.batch_size] + [1], dtype=np.float32)
 
         for i, ind in enumerate(index_array):
             vehicle_id, instance_id = self.dataset.X[self.part][ind]
@@ -55,9 +57,11 @@ class BoxCarsDataGenerator(Iterator):
             x[i, ...] = image
             y1[i, ...] = self.dataset.Y[self.part][ind][0]
             y2[i, ...] = self.dataset.Y[self.part][ind][1]
+            y3[i, ...] = self.dataset.Y[self.part][ind][2]
+            y4[i, ...] = self.dataset.Y[self.part][ind][3]
 
         if not self.generate_y:
             return x
 
-        return (x, {'output_d': y1, 'output_a': y2})
+        return (x, {'output_d': y1, 'output_a0': y2, 'output_a1': y3, 'output_a2': y4})
 

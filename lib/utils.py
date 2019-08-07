@@ -116,6 +116,8 @@ def cross_from_points(bb3d, img=None):
 
 def get_true_angle(bb3d):
     angles = cross_from_points(bb3d)
-    angle0 = floor(- angles[0] / 3.0) + 30
-    return angle0
+    for i in range(len(angles)):
+        angles[i] = floor(- angles[i] / 3.0) + 30
+
+    return angles
 
