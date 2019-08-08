@@ -2,8 +2,11 @@ import csv
 import cv2
 import os
 import json
+import numpy as np
 from math import tan, pi
 
+import _init_paths
+from utils import visualize_prediction_boxes
 
 dir = 'cropped_img'
 try:
@@ -32,10 +35,7 @@ BOXCAR_FOLDER = '/home/vivacityserver6/repos/BoxCars/'
 OUTPUT_PATH = os.path.join(BOXCAR_FOLDER, 'output')
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 PATH_VIDEO = os.path.join(PATH_VIDEO_FOLDER,'test_3.mp4')
-MODEL_PATH = '/home/vivacityserver6/repos/BoxCars/cache/snapshots/model_test_003.h5'
-PATH_JSON = '/home/vivacityserver6/repos/BoxCars/output/prediction.json'
-
-
+PATH_JSON = '/home/vivacityserver6/repos/BoxCars/output/prediction_3angles_60bins_resnet_008.json'
 
 def crop_and_save(img_name, image):
 	if not os.path.exists(os.path.join(OUTPUT_PATH, 'cropped_img')):
@@ -71,6 +71,7 @@ def analyse_video(cropping_img):
 
 	while((img_count<len(BOX_LIST)) & (vidcap.isOpened() == True)):
 		success, image = vidcap.read()
+
 		for line in BOX_LIST:
 			#print(line[0], frame_count)
 			#print("line ", line)
@@ -85,30 +86,33 @@ def analyse_video(cropping_img):
 				
 				img_name = '_'.join([str(frame_count), str(img_count), class_label])
 				img_cropped = image[y:y+height, x:x+width]
+				crop_coordinates = np.array([x, y, width, height], dtype='int32')
 				if cropping_img:
     					
     					crop_and_save(img_name, img_cropped)
 				
 				else:
 					predictions = read_direction(PATH_JSON)
+					prediction_per_image = predictions[img_name]
+					image = visualize_prediction_boxes(prediction_per_image=prediction_per_image, image=image, cropped_img = True, crop_coordinates = crop_coordinates)
+
+					# directions_predictions = predictions[img_name]['output_d']
+					# direction = directions_predictions.index(max(directions_predictions))
+					# angle_predictions = predictions[img_name]['output_a']
+					# angle = (angle_predictions.index(max(angle_predictions)) - 3) * 30
 					
-					directions_predictions = predictions[img_name]['output_d']
-					direction = directions_predictions.index(max(directions_predictions))
-					angle_predictions = predictions[img_name]['output_a']
-					angle = (angle_predictions.index(max(angle_predictions)) - 3) * 30
-					
-					left_point = (round(x), round(y + height/2 + width/2 * tan(angle * pi / 180)))
-					right_point = (round(x+width), round(y + height/2 - width/2 * tan(angle * pi / 180)))
-					if direction == 1:
-						text = 'to_camera'
-						cv2.rectangle(image,(x, y), (x+width, y+height),(0,0,255),3)	# draw green box for 2D bbox
-						cv2.line(image, left_point, right_point, (0,0,255),3)	# draw green box for 2D bbox
-						cv2.putText(image, text ,(x, y), FONT, 1, (0,0,255), 2, cv2.LINE_AA)
-					else:
-						text = 'from_camera'
-						cv2.rectangle(image,(x, y), (x+width, y+height),(0,255,0),3)	# draw green box for 2D bbox
-						cv2.line(image, left_point, right_point, (0,255,0),3)	# draw green box for 2D bbox
-						cv2.putText(image, text ,(x, y), FONT, 1, (0,255,0), 2, cv2.LINE_AA)
+					# left_point = (round(x), round(y + height/2 + width/2 * tan(angle * pi / 180)))
+					# right_point = (round(x+width), round(y + height/2 - width/2 * tan(angle * pi / 180)))
+					# if direction == 1:
+					# 	text = 'to_camera'
+					# 	cv2.rectangle(image,(x, y), (x+width, y+height),(0,0,255),3)	# draw green box for 2D bbox
+					# 	cv2.line(image, left_point, right_point, (0,0,255),3)	# draw green box for 2D bbox
+					# 	cv2.putText(image, text ,(x, y), FONT, 1, (0,0,255), 2, cv2.LINE_AA)
+					# else:
+					# 	text = 'from_camera'
+					# 	cv2.rectangle(image,(x, y), (x+width, y+height),(0,255,0),3)	# draw green box for 2D bbox
+					# 	cv2.line(image, left_point, right_point, (0,255,0),3)	# draw green box for 2D bbox
+					# 	cv2.putText(image, text ,(x, y), FONT, 1, (0,255,0), 2, cv2.LINE_AA)
 
 				img_count += 1
 
@@ -118,7 +122,7 @@ def analyse_video(cropping_img):
 				break
 
 		cv2.imshow('frame', image)
-		if cv2.waitKey(20) & 0xFF == ord('q'):
+		if cv2.waitKey(100) & 0xFF == ord('q'):
 			break
 
 	vidcap.release()

@@ -8,7 +8,7 @@ from keras.models import load_model
 
 # should be modified to args. later
 OUTPUT_PATH = '/home/vivacityserver6/repos/BoxCars/output'
-MODEL_PATH = '/home/vivacityserver6/repos/BoxCars/cache/snapshots/model_60bins_resnet_008.h5'
+MODEL_PATH = '/home/vivacityserver6/repos/BoxCars/cache/snapshots/model_3angles_60bins_resnet_008.h5'
 folder_path = '/home/vivacityserver6/repos/BoxCars/output/cropped_img'
 
 def read_img_name(file_path):
@@ -59,7 +59,9 @@ def predictions_for_folder(model, folder_path):
         prediction_img = model.predict_on_batch(image_predict)
         prediction_folder[file.split('.')[0]] = {}
         prediction_folder[file.split('.')[0]]['output_d'] = prediction_img[0].tolist()[0]
-        prediction_folder[file.split('.')[0]]['output_a'] = prediction_img[1].tolist()[0]
+        prediction_folder[file.split('.')[0]]['output_a0'] = prediction_img[1].tolist()[0]
+        prediction_folder[file.split('.')[0]]['output_a1'] = prediction_img[2].tolist()[0]
+        prediction_folder[file.split('.')[0]]['output_a2'] = prediction_img[3].tolist()[0]
 
     return prediction_folder
     '''
@@ -81,7 +83,7 @@ def predictions_for_folder(model, folder_path):
 if __name__ == '__main__':
     model = load_model(MODEL_PATH)
     predictions = predictions_for_folder(model, folder_path)
-    with open('/home/vivacityserver6/repos/BoxCars/output/prediction_60bins.json', 'w+') as file:
+    with open('/home/vivacityserver6/repos/BoxCars/output/prediction_3angles_60bins_resnet_008.json', 'w+') as file:
         json.dump(predictions, file, separators=(',', ':'), indent = 4)
 
     

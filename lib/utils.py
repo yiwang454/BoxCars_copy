@@ -3,7 +3,11 @@ import pickle
 import os
 import numpy as np
 import sys
-from math import floor
+import cv2
+from math import floor, cos, sin, pi
+
+angle_numbers = 3
+FONT = cv2.FONT_HERSHEY_SIMPLEX
 
 #%%
 def load_cache(path, encoding="latin-1", fix_imports=True):
@@ -121,3 +125,117 @@ def get_true_angle(bb3d):
 
     return angles
 
+
+def from_angle_to_coordinates(angle, img_size):
+    y = img_size[0] // 2
+    x = img_size[1] // 2
+    if arrow:
+        left_point = (x, y)
+    else:
+        left_point = (round(x - 60 * cos( - angle * pi / 180)), round(y - 60 * sin( - angle * pi / 180)))
+    right_point = (round(x + 60 * cos( - angle * pi / 180)), round(y + 60 * sin( - angle * pi / 180)))
+    return left_point, right_point
+
+
+def visualize_prediction_arrows(prediction_per_image, image, image_name, bb3d, angle_idx):
+    directions_predictions = prediction_per_image['output_d']
+    direction = directions_predictions.index(max(directions_predictions))
+    
+    if angle_idx < angle_numbers:
+        angle = get_angle_from_prediction(prediction_per_image, angle_idx)
+        true_angle = - cross_from_points(bb3d)[angle_idx]
+        L, R = from_angle_to_coordinates(angle, image.shape)
+        true_L, true_R = from_angle_to_coordinates(true_angle, image.shape)
+
+    else:
+        L_R = []
+        for i in range(angle_numbers):
+            angle = get_angle_from_prediction(prediction_per_image, 2-i)
+            L, R = from_angle_to_coordinates(angle, image.shape)
+            L_R.append((L, R))
+
+    if direction == 1:
+        text = 'to_camera'
+        color = (0,0,255)
+    else:
+        text = 'from_camera'
+        color = (0,255,0)
+
+    if angle_idx < angle_numbers:
+        cv2.arrowedLine(image, true_L, true_R, (255, 0, 0), 3)
+        cv2.putText(image, 'true_angle: {}'.format(true_angle), (0, 40), FONT, 0.5, (255,0,0), 1, cv2.LINE_AA)
+
+        cv2.arrowedLine(image, L, R, color, 3)	# need one per angle
+        cv2.putText(image, 'predict_angle{}: {}'.format(angle_idx, angle), (0, 20), FONT, 0.5, color, 1, cv2.LINE_AA)  # print predicted angles.need one per angle
+
+    else:
+        colors = [(0,0,0), (0,255,255), (255, 0, 0)]
+        try:
+            coordinate_color = list(zip(L_R, colors))
+        except AssertionError:
+            print('more than 3 angles')
+        
+        for i, c_and_c in enumerate(coordinate_color):
+            (L, R), arrow_color = c_and_c
+            cv2.arrowedLine(image, L, R, arrow_color, 3)	# need one per angle            
+            cv2.putText(image, 'predict_angle{}: {}'.format(i, angle), (0, 15 * (i + 1)), FONT, 0.5, arrow_color, 1, cv2.LINE_AA)  # print predicted angles.need one per angle
+
+    cv2.putText(image, text, (0, image.shape[0]), FONT, 1, color, 1, cv2.LINE_AA) #print direction, need one line in a image anyways
+
+    cv2.imwrite(image_name, image)
+
+def get_angle_from_prediction(prediction_per_image, angle_idx):
+    key = 'output_a{}'.format(angle_idx)
+    prediction = prediction_per_image[key]
+    angle = (prediction.index(max(prediction)) - 30) * 3.0
+
+    return angle
+
+
+def get_point_from_angle(angle):
+    return np.array([round(20 * cos( - angle * pi / 180)), round(20 * sin( - angle * pi / 180))])
+
+def visualize_prediction_boxes(prediction_per_image, image, cropped_img = False, crop_coordinates = np.zeros([4], dtype='int32')):
+    if not cropped_img:
+        crop_coordinates[2] = image.shape[1]
+        crop_coordinates[3] = image.shape[0] # coordinate order: x, y, width, height
+
+    directions_predictions = prediction_per_image['output_d']
+    direction = directions_predictions.index(max(directions_predictions))
+
+    points = np.zeros([angle_numbers, 2], dtype='int32')
+    for i in range(angle_numbers):
+        angle = get_angle_from_prediction(prediction_per_image, i)
+        points[i] = get_point_from_angle(angle)
+       
+    y = crop_coordinates[1] + crop_coordinates[3] // 2
+    x = crop_coordinates[0] + crop_coordinates[2] // 2
+    base_point = np.array([x, y], dtype = 'int32')
+
+    img_scale_x = crop_coordinates[2] / 110
+    img_scale_y = crop_coordinates[3] / 110
+    scale = np.array([img_scale_x, img_scale_y], dtype='float32')
+
+    coordinates = []
+    for i in iter([-1, 1]):
+        for j in iter([-1, 1]):
+            for k in iter([-1, 1]):
+                raw_coordinate = - (k*j) * points[0] - j * points[1] - i * points[2]
+                coordinate = np.multiply(scale, raw_coordinate, casting='unsafe', dtype='float32') + base_point
+                int_coordinate = coordinate.astype(dtype = 'int64', casting = 'unsafe')
+                coordinates.append(tuple(int_coordinate))
+    
+    for u in range(4):
+        cv2.line(image, coordinates[u], coordinates[(u + 1) % 4], (255, 0, 0), 2)	# need one per angle            
+        cv2.line(image, coordinates[u], coordinates[u + 4], (0, 0, 0), 2)	# need one per angle            
+        cv2.line(image, coordinates[u + 4], coordinates[(u + 1)%4 + 4], (255, 0, 0), 2)	# need one per angle            
+    
+    if direction == 1:
+        text = 'to_camera'
+        color = (0,0,255)
+    else:
+        text = 'from_camera'
+        color = (0,255,0)
+    cv2.putText(image, text ,(crop_coordinates[0], crop_coordinates[1] + crop_coordinates[3]), FONT, 1, color, 1, cv2.LINE_AA) #print direction, need one line in a image anyways
+
+    return image
