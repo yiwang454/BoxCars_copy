@@ -1,1 +1,27 @@
 cache
+
+# folders to be ignored:
+archive
+cropped_img
+ims
+output
+
+# log_files
+*.csv
+*.json
+*.txt
+
+# media files
+*.png
+*.jpg
+*.mp4
+*.avi
+
+# compiling file
+*.pyc
+scripts/__pycache__/
+
+# C extensions
+*.so
+
+
