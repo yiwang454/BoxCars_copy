@@ -19,7 +19,6 @@ output
 
 # compiling file
 *.pyc
-scripts/__pycache__/*
 
 # C extensions
 *.so
