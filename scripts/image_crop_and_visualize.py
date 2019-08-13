@@ -7,6 +7,7 @@ from math import tan, pi
 
 import _init_paths
 from utils import visualize_prediction_boxes
+import time
 
 dir = 'cropped_img'
 try:
@@ -68,8 +69,9 @@ def analyse_video(cropping_img):
 	frame_count = 1
 
 	BOX_LIST = read_bbox(os.path.join(PATH_VIDEO_FOLDER, 'test_3mp4_detections_out.csv'))
-
+	predictions = read_direction(PATH_JSON)
 	while((img_count<len(BOX_LIST)) & (vidcap.isOpened() == True)):
+		frame_t0 = time.time()
 		success, image = vidcap.read()
 
 		for line in BOX_LIST:
@@ -88,11 +90,8 @@ def analyse_video(cropping_img):
 				img_cropped = image[y:y+height, x:x+width]
 				crop_coordinates = np.array([x, y, width, height], dtype='int32')
 				if cropping_img:
-    					
-    					crop_and_save(img_name, img_cropped)
-				
+					crop_and_save(img_name, img_cropped)
 				else:
-					predictions = read_direction(PATH_JSON)
 					prediction_per_image = predictions[img_name]
 					image = visualize_prediction_boxes(prediction_per_image=prediction_per_image, image=image, cropped_img = True, crop_coordinates = crop_coordinates)
 
@@ -122,9 +121,12 @@ def analyse_video(cropping_img):
 				break
 
 		cv2.imshow('frame', image)
-		if cv2.waitKey(100) & 0xFF == ord('q'):
+		show_time = int((time.time() - frame_t0)*1000)
+		print((time.time() - frame_t0), show_time)
+		print("FPS", 1/(time.time() - frame_t0))
+		if cv2.waitKey(show_time) & 0xFF == ord('q'):
 			break
-
+		
 	vidcap.release()
 	cv2.destroyAllWindows()
 

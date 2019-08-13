@@ -4,7 +4,7 @@ import os
 import numpy as np
 import sys
 import cv2
-from math import floor, cos, sin, pi
+from math import floor, cos, sin, pi, sqrt
 
 angle_numbers = 3
 FONT = cv2.FONT_HERSHEY_SIMPLEX
@@ -94,6 +94,10 @@ def get_angle_from_two_points(p1, p2, deg=True):
     else:
         return angle
 
+
+def get_length_from_points(p1, p2):
+    return sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2)
+
         
 def cross_from_points(bb3d, img=None):
     front_lines = [(0, 5, 1, 4), (1, 6, 2, 5), (0, 2, 1, 3)]
@@ -117,6 +121,26 @@ def cross_from_points(bb3d, img=None):
         return img, angles
     else:
         return angles
+
+def three_normalized_dimensions(bb3d, normal_length = 1):
+    """
+    return dimensions in this order: length, width, height
+    """
+    dimensions = []
+    front_lines = [(0, 5, 1, 4), (1, 6, 2, 5), (0, 2, 1, 3)]
+    back_lines = [(3, 6, 2, 7), (3, 4, 0, 7), (4, 6, 5, 7)]
+    for f, b in zip(front_lines, back_lines):
+        L1 = line(bb3d[f[0], :], bb3d[f[1], :])
+        L2 = line(bb3d[f[2], :], bb3d[f[3], :])
+        R12 = intersection(L1, L2)
+
+        L3 = line(bb3d[b[0], :], bb3d[b[1], :])
+        L4 = line(bb3d[b[2], :], bb3d[b[3], :])
+        R34 = intersection(L3, L4)
+        norm_len = get_length_from_points(R12, R34) / normal_length
+        dimensions.append(floor(norm_len / 0.015))
+    
+    return dimensions
 
 def get_true_angle(bb3d):
     angles = cross_from_points(bb3d)
@@ -217,9 +241,9 @@ def visualize_prediction_boxes(prediction_per_image, image, cropped_img = False,
     scale = np.array([img_scale_x, img_scale_y], dtype='float32')
 
     coordinates = []
-    for i in iter([-1, 1]):
-        for j in iter([-1, 1]):
-            for k in iter([-1, 1]):
+    for i in [-1, 1]:
+        for j in [-1, 1]:
+            for k in [-1, 1]:
                 raw_coordinate = - (k*j) * points[0] - j * points[1] - i * points[2]
                 coordinate = np.multiply(scale, raw_coordinate, casting='unsafe', dtype='float32') + base_point
                 int_coordinate = coordinate.astype(dtype = 'int64', casting = 'unsafe')
@@ -239,3 +263,22 @@ def visualize_prediction_boxes(prediction_per_image, image, cropped_img = False,
     cv2.putText(image, text ,(crop_coordinates[0], crop_coordinates[1] + crop_coordinates[3]), FONT, 1, color, 1, cv2.LINE_AA) #print direction, need one line in a image anyways
 
     return image
+
+
+def image_preprocess(im):
+    
+    desired_size = 224
+
+    old_size = im.shape[:2]  # im.shape is in (height, width, channel) format
+
+    ratio = float(desired_size)/max(old_size)
+    new_size = tuple([int(x*ratio) for x in old_size])
+    im = cv2.resize(im, (new_size[1], new_size[0]), interpolation=cv2.INTER_AREA)
+
+    # create a new image and paste the resized on it
+    new_im = np.zeros((desired_size, desired_size, 3), dtype=np.uint8)
+    offset_x = (desired_size-new_size[1])//2
+    offset_y = (desired_size-new_size[0])//2
+    new_im[offset_y: offset_y + new_size[0], offset_x: offset_x + new_size[1]] = im
+    
+    return new_im

@@ -33,10 +33,14 @@ class BoxCarsDataGenerator(Iterator):
         y2 = np.empty([self.batch_size] + [1], dtype=np.float32)
         y3 = np.empty([self.batch_size] + [1], dtype=np.float32)
         y4 = np.empty([self.batch_size] + [1], dtype=np.float32)
+        y5 = np.empty([self.batch_size] + [1], dtype=np.float32)
+        y6 = np.empty([self.batch_size] + [1], dtype=np.float32)
+        y7 = np.empty([self.batch_size] + [1], dtype=np.float32)
 
         for i, ind in enumerate(index_array):
             vehicle_id, instance_id = self.dataset.X[self.part][ind]
             '''
+            #might be used to check how image data has been shuffled and fed in
             if vehicle_id in self.check_repeatation.keys():
                 if instance_id in self.check_repeatation[vehicle_id].keys():
                     self.check_repeatation[vehicle_id][instance_id] += 1
@@ -59,9 +63,18 @@ class BoxCarsDataGenerator(Iterator):
             y2[i, ...] = self.dataset.Y[self.part][ind][1]
             y3[i, ...] = self.dataset.Y[self.part][ind][2]
             y4[i, ...] = self.dataset.Y[self.part][ind][3]
+            y5[i, ...] = self.dataset.Y[self.part][ind][4]
+            y6[i, ...] = self.dataset.Y[self.part][ind][5]
+            y7[i, ...] = self.dataset.Y[self.part][ind][6]
 
         if not self.generate_y:
             return x
 
-        return (x, {'output_d': y1, 'output_a0': y2, 'output_a1': y3, 'output_a2': y4})
+        return (x, {'output_d': y1, 
+                    'output_a0': y2, 
+                    'output_a1': y3, 
+                    'output_a2': y4,
+                    'output_dim0': y5,
+                    'output_dim1': y6,
+                    'output_dim2': y7})
 

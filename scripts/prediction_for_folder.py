@@ -6,6 +6,9 @@ import keras
 import numpy as np
 from keras.models import load_model
 
+import _init_paths
+from utils import image_preprocess
+
 # should be modified to args. later
 OUTPUT_PATH = '/home/vivacityserver6/repos/BoxCars/output'
 MODEL_PATH = '/home/vivacityserver6/repos/BoxCars/cache/snapshots/model_3angles_60bins_resnet_008.h5'
@@ -53,7 +56,7 @@ def predictions_for_folder(model, folder_path):
         image = cv2.imread(os.path.join(folder_path, file))
         # read and preprocess img
         image_pro = (image.astype(np.float32) - 116)/128.
-        image_predict = cv2.resize(image_pro, (224, 224), interpolation=cv2.INTER_AREA)
+        image_predict = image_preprocess(image_pro)
         image_predict.resize((1, image_predict.shape[0],image_predict.shape[1], image_predict.shape[2]))
 
         prediction_img = model.predict_on_batch(image_predict)

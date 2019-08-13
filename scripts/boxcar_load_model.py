@@ -1,14 +1,15 @@
+from keras.models import load_model
 import numpy as np
 import json
 import os
 import _init_paths
 from math import sin, cos, pi
 import cv2
-
+from multiprocessing import Pool
 
 from boxcars_dataset import BoxCarsDataset
 from boxcars_data_generator import BoxCarsDataGenerator
-from utils import cross_from_points, get_true_angle, get_angle_from_prediction, visualize_prediction_boxes, visualize_prediction_arrows
+from utils import cross_from_points, get_true_angle, get_angle_from_prediction, visualize_prediction_boxes, visualize_prediction_arrows, three_normalized_dimensions
 
 '''
 input:  model_path,    
@@ -60,7 +61,7 @@ def predictions_for_whole_dataset(model, dataset):
 
     return predictions
 
-def visualize_prediction_batch(model, getting_angle, angle_idx, arrow_visualize):
+def visualize_prediction_batch(getting_angle, angle_idx, model=None, arrow_visualize=False):
     estimated_3DBB = None
     estimated_prediction = False
 
@@ -90,8 +91,8 @@ def visualize_prediction_batch(model, getting_angle, angle_idx, arrow_visualize)
         angles = [ground_truth, predicts]
 
     for idx, (vehicle_id, label) in enumerate(part_data):
-        if idx < part_size + initial_image_idx and idx >= initial_image_idx:
-        #if getting_angle:
+        if getting_angle or (not getting_angle and idx < part_size + initial_image_idx and idx >= initial_image_idx):
+        
             instances = dataset.dataset["samples"][vehicle_id]["instances"]
 
             for instance_id in range(len(instances)):
@@ -110,22 +111,51 @@ def visualize_prediction_batch(model, getting_angle, angle_idx, arrow_visualize)
                         cv2.imwrite(image_name, image)
                 #The following lines: added for getting angle
                 else:
-                    key = 'output_a{}'.format(angle_idx)
-                    predict_angle = get_angle_from_prediction(prediction_image[key])
+                    predict_angle = get_angle_from_prediction(prediction_image, angle_idx)
                     true_angles = cross_from_points(bb3d)
                     several_angles = [- true_angles[angle_idx], predict_angle]
-                    for idx, angle in enumerate(angles):
-                        angle.append(several_angles[idx])
+                    for index, angle in enumerate(angles):
+                        angle.append(several_angles[index])
 
     if getting_angle:
         return angles
+
+
+
+
+def get_length(dim_idx):
+    estimated_3DBB = None
+
+    if estimated_3DBB == None:
+        dataset = BoxCarsDataset(load_split="hard", load_atlas=True)
+    else:
+        dataset = BoxCarsDataset(load_split="hard", load_atlas=True, 
+                                use_estimated_3DBB = True, estimated_3DBB_path = estimated_3DBB)
+
+    dataset.initialize_data('test')
+
+    part_data = dataset.split['test']
+
+    def get_length_thread(vehicle_id):
+                
+        instances = dataset.dataset["samples"][vehicle_id]["instances"]
+
+        for instance_id in range(len(instances)):
+                
+            vehicle, instance, bb3d = dataset.get_vehicle_instance_data(vehicle_id, instance_id)
+            diagonal_length = dataset.get_image_diagonal(vehicle_id, instance_id)
+            three_normalized_dimensions(bb3d=bb3d, normal_length = diagonal_length)
+
+    vehicle_id_list = []
+    with Pool(5) as p:
+        length = p.map(f, vehicle_id_list)
+
+    return length
 
 def main():
     # visualize_prediction_batch(False, 0)
     # visualize_prediction_batch(False, 1)
     # visualize_prediction_batch(False, 2)
-    import keras
-    from keras.models import load_model
 
     model = load_model(model_path)
 

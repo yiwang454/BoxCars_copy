@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 from config import BOXCARS_DATASET,BOXCARS_ATLAS,BOXCARS_CLASSIFICATION_SPLITS
-from utils import load_cache, cross_from_points, get_true_angle
+from utils import load_cache, cross_from_points, get_true_angle, three_normalized_dimensions, image_preprocess
 import _init_paths
 
 import cv2
 import numpy as np
+from math import sqrt
 
 #%%
 class BoxCarsDataset(object):
@@ -43,9 +44,9 @@ class BoxCarsDataset(object):
         """
         returns decoded image from atlas in RGB channel order
         """
-        #image = cv2.cvtColor(cv2.imdecode(self.atlas[vehicle_id][instance_id], 1), cv2.COLOR_BGR2GRAY)
         image = cv2.cvtColor(cv2.imdecode(self.atlas[vehicle_id][instance_id], 1), cv2.COLOR_BGR2RGB)
-        return cv2.resize(image, (224, 224), interpolation=cv2.INTER_AREA)
+        return image_preprocess(image)
+        #cv2.resize(image, (224, 224), interpolation=cv2.INTER_AREA)
         
     #%%
     def get_vehicle_instance_data(self, vehicle_id, instance_id, original_image_coordinates=False):
@@ -66,7 +67,13 @@ class BoxCarsDataset(object):
 
         return vehicle, instance, bb3d 
             
-       
+    def get_image_diagonal(self, vehicle_id, instance_id):
+        """
+        return image diagonal length to normalize dimension values in float number
+        """
+        image_shape = cv2.imdecode(self.atlas[vehicle_id][instance_id], 1).shape
+        return sqrt(image_shape[1] ** 2 + image_shape[0] ** 2)
+
     #%%
     def initialize_data(self, part):
         assert self.split is not None, "load classification split first"
@@ -89,7 +96,8 @@ class BoxCarsDataset(object):
                 instance = self.dataset["samples"][vehicle_id]["instances"][i]
                 bb3d = instance["3DBB"]
                 angles = get_true_angle(bb3d)
-                y.append([label_inout] + angles)           
+                dimensions = three_normalized_dimensions(bb3d=bb3d, normal_length=self.get_image_diagonal(vehicle_id, i))
+                y.append([label_inout] + angles + dimensions)           
                         
         self.X[part] = np.asarray(x,dtype=int)
 
@@ -104,8 +112,8 @@ class BoxCarsDataset(object):
         
 
 
-    def get_number_of_classes(self):
-        return len(self.split["types_mapping"])
+    # def get_number_of_classes(self):
+    #     return len(self.split["types_mapping"])
         
         
     def evaluate(self, predictions, part="test", top_k=1):
