@@ -2,15 +2,16 @@ import _init_paths
 import os
 import json
 from utils import ensure_dir, parse_args
+from learningratefinder import LearningRateFinder
 
 from boxcars_dataset import BoxCarsDataset
 from boxcars_data_generator import BoxCarsDataGenerator
 
 import keras
-from keras.models import Sequential, Model
+from keras.models import Sequential, Model, load_model
 from keras.layers import Input, Dense, Activation,Conv2D, MaxPooling2D, BatchNormalization, Flatten, LeakyReLU
 from keras.applications.resnet50 import ResNet50
-from keras.optimizers import Adadelta
+from keras.optimizers import Adadelta, SGD
 from keras.callbacks import ModelCheckpoint, TensorBoard
 
 import matplotlib.pyplot as plt
@@ -28,9 +29,11 @@ estimated_3DBB = None
 using_VGG = False
 using_resnet = True
 cache = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "cache"))
-snapshots_file = "model_3angles_and_dimensions_60bins_resnet_{epoch:03d}.h5"
+snapshots_file = "model_3angles_and_dimensions_60bins_resnet_SGD_{epoch:03d}.h5"
+latest_model_path = ""
 angle_fig_file = "./loss_acc_3angles_60bins_resnet.png"
 dimension_fig_file = "./loss_acc_3dimesnions_60bins_resnet.png"
+lr_search = False
 
 def VGG_model():
     model_main = Sequential()
@@ -162,7 +165,8 @@ if using_VGG:
 elif using_resnet:
     model = Model(inputs=model_main.input, outputs=output_list)
 
-optimizer = Adadelta(rho = 0.95)
+# optimizer = Adadelta(rho = 0.95)
+optimizer = SGD(lr=1e-3, momentum=0.9)
 model.compile(loss=keras.losses.sparse_categorical_crossentropy,
               optimizer=optimizer,
               metrics=['accuracy'])
@@ -182,128 +186,119 @@ ensure_dir(snapshots_dir)
 #tb_callback = TensorBoard(tensorboard_dir, histogram_freq=0, write_graph=True, write_images=True)
 saver_callback = ModelCheckpoint(os.path.join(snapshots_dir, snapshots_file), period=2)
 
-current_epoch = 0
+if lr_search:
+    old_model = load_model(latest_model_path)
+    lrf = LearningRateFinder(model)
+    lrf.find(
+        generator_train,
+        1e-8, 1e+1,
+        epochs=1,
+        stepsPerEpoch=generator_train.n // batch_size,
+        batchSize=64
+    )
 
-output_angle_loss = [[] for _ in range(angle_number)]
-output_angle_acc = [[] for _ in range(angle_number)]
-val_output_angle_loss = [[] for _ in range(angle_number)]
-val_output_angle_acc = [[] for _ in range(angle_number)]
+else:
 
-output_dimension_loss = [[] for _ in range(dimension_number)]
-output_dimension_acc = [[] for _ in range(dimension_number)]
-val_output_dimension_loss = [[] for _ in range(dimension_number)]
-val_output_dimension_acc = [[] for _ in range(dimension_number)]
+    current_epoch = 0
 
-epochs_list = []
+    output_angle_loss = [[] for _ in range(angle_number)]
+    output_angle_acc = [[] for _ in range(angle_number)]
+    val_output_angle_loss = [[] for _ in range(angle_number)]
+    val_output_angle_acc = [[] for _ in range(angle_number)]
 
+    output_dimension_loss = [[] for _ in range(dimension_number)]
+    output_dimension_acc = [[] for _ in range(dimension_number)]
+    val_output_dimension_loss = [[] for _ in range(dimension_number)]
+    val_output_dimension_acc = [[] for _ in range(dimension_number)]
 
-for training_loop in range(epochs // epoch_period):
-    h = model.fit_generator(generator=generator_train, 
-                        steps_per_epoch=generator_train.n // batch_size,
-                        epochs=current_epoch + epoch_period,
-                        verbose=1,
-                        validation_data=generator_val,
-                        validation_steps=generator_val.n // batch_size,
-                        callbacks=[saver_callback],
-                        initial_epoch = current_epoch,
-                        )
-                        
-    history = h.history
-    print(history)
-
-    current_epoch += epoch_period
-    epochs_list.append(current_epoch)
-
-    # angle loss and accuracy
-    for i, angle_loss in enumerate(output_angle_loss):
-        key = 'output_a{}_loss'.format(i)
-        angle_loss.extend(history[key])
-
-    for i, angle_acc in enumerate(output_angle_acc):
-        key = 'output_a{}_acc'.format(i)
-        angle_acc.extend(history[key])
-
-    for i, val_angle_loss in enumerate(val_output_angle_loss):
-        key = 'val_output_a{}_loss'.format(i)
-        val_angle_loss.extend(history[key])
-
-    for i, val_angle_acc in enumerate(val_output_angle_acc):
-        key = 'val_output_a{}_acc'.format(i)
-        val_angle_acc.extend(history[key])
+    epochs_list = []
 
 
-    # dimension loss and accuracy
-    for i, dimension_loss in enumerate(output_dimension_loss):
-        key = 'output_dim{}_loss'.format(i)
-        dimension_loss.extend(history[key])
+    for training_loop in range(epochs // epoch_period):
+        h = model.fit_generator(generator=generator_train, 
+                            steps_per_epoch=generator_train.n // batch_size,
+                            epochs=current_epoch + epoch_period,
+                            verbose=1,
+                            validation_data=generator_val,
+                            validation_steps=generator_val.n // batch_size,
+                            callbacks=[saver_callback],
+                            initial_epoch = current_epoch,
+                            )
+                            
+        history = h.history
+        print(history)
 
-    for i, dimension_acc in enumerate(output_dimension_acc):
-        key = 'output_dim{}_acc'.format(i)
-        dimension_acc.extend(history[key])
+        current_epoch += epoch_period
+        epochs_list.append(current_epoch)
 
-    for i, val_dimension_loss in enumerate(val_output_dimension_loss):
-        key = 'val_output_dim{}_loss'.format(i)
-        val_dimension_loss.extend(history[key])
+        # angle loss and accuracy
+        for i, angle_loss in enumerate(output_angle_loss):
+            key = 'output_a{}_loss'.format(i)
+            angle_loss.extend(history[key])
 
-    for i, val_dimension_acc in enumerate(val_output_dimension_acc):
-        key = 'val_output_dim{}_acc'.format(i)
-        val_dimension_acc.extend(history[key])
+        for i, angle_acc in enumerate(output_angle_acc):
+            key = 'output_a{}_acc'.format(i)
+            angle_acc.extend(history[key])
 
-    plt.figure(figsize=(24, 6))
-    for i in range(angle_number):
-        plt.subplot(1, angle_number, i + 1)
-        plt.plot(epochs_list, output_angle_loss[i], 'r--')
-        plt.plot(epochs_list, output_angle_acc[i], 'r-')
-        plt.plot(epochs_list, val_output_angle_loss[i], 'b--')
-        plt.plot(epochs_list, val_output_angle_acc[i], 'b-')
-        plt.xlim(0, epochs)
-        plt.legend(['output_a{}_loss'.format(i), 'output_a{}_acc'.format(i), 'val_output_a{}_loss'.format(i), 'val_output_a{}_acc'.format(i)])
-        plt.xlabel('Epochs')
-        plt.ylabel('angle_loss and accuracy')
-    plt.savefig(angle_fig_file)
-    plt.clf()
+        for i, val_angle_loss in enumerate(val_output_angle_loss):
+            key = 'val_output_a{}_loss'.format(i)
+            val_angle_loss.extend(history[key])
 
-    plt.figure(figsize=(24, 6))
-    for i in range(dimension_number):
-        plt.subplot(1, dimension_number, i + 1)
-        plt.plot(epochs_list, output_dimension_loss[i], 'r--')
-        plt.plot(epochs_list, output_dimension_acc[i], 'r-')
-        plt.plot(epochs_list, val_output_dimension_loss[i], 'b--')
-        plt.plot(epochs_list, val_output_dimension_acc[i], 'b-')
-        plt.xlim(0, epochs)
-        plt.legend(['output_dim{}_loss'.format(i), 'output_dim{}_acc'.format(i), 'val_output_dim{}_loss'.format(i), 'val_output_dim{}_acc'.format(i)])
-        plt.xlabel('Epochs')
-        plt.ylabel('dimension_loss and accuracy')
-
-    plt.savefig(dimension_fig_file)
-    plt.clf()
+        for i, val_angle_acc in enumerate(val_output_angle_acc):
+            key = 'val_output_a{}_acc'.format(i)
+            val_angle_acc.extend(history[key])
 
 
-'''
-total_eval = {}
-total_eval['train'] = train_evaluations
-total_eval['val'] = val_evaluations
-total_eval['test'] = test_evaluations
-'''
- 
-model.save('./model_angle_and_dimension_60bins_resnet_epoch{}_direction_angle.h5'.format(epochs))
+        # dimension loss and accuracy
+        for i, dimension_loss in enumerate(output_dimension_loss):
+            key = 'output_dim{}_loss'.format(i)
+            dimension_loss.extend(history[key])
+
+        for i, dimension_acc in enumerate(output_dimension_acc):
+            key = 'output_dim{}_acc'.format(i)
+            dimension_acc.extend(history[key])
+
+        for i, val_dimension_loss in enumerate(val_output_dimension_loss):
+            key = 'val_output_dim{}_loss'.format(i)
+            val_dimension_loss.extend(history[key])
+
+        for i, val_dimension_acc in enumerate(val_output_dimension_acc):
+            key = 'val_output_dim{}_acc'.format(i)
+            val_dimension_acc.extend(history[key])
+
+        plt.figure(figsize=(24, 6))
+        for i in range(angle_number):
+            plt.subplot(1, angle_number, i + 1)
+            plt.plot(epochs_list, output_angle_loss[i], 'r--')
+            plt.plot(epochs_list, output_angle_acc[i], 'r-')
+            plt.plot(epochs_list, val_output_angle_loss[i], 'b--')
+            plt.plot(epochs_list, val_output_angle_acc[i], 'b-')
+            plt.xlim(0, epochs)
+            plt.legend(['output_a{}_loss'.format(i), 'output_a{}_acc'.format(i), 'val_output_a{}_loss'.format(i), 'val_output_a{}_acc'.format(i)])
+            plt.xlabel('Epochs')
+            plt.ylabel('angle_loss and accuracy')
+        plt.savefig(angle_fig_file)
+        plt.clf()
+
+        plt.figure(figsize=(24, 6))
+        for i in range(dimension_number):
+            plt.subplot(1, dimension_number, i + 1)
+            plt.plot(epochs_list, output_dimension_loss[i], 'r--')
+            plt.plot(epochs_list, output_dimension_acc[i], 'r-')
+            plt.plot(epochs_list, val_output_dimension_loss[i], 'b--')
+            plt.plot(epochs_list, val_output_dimension_acc[i], 'b-')
+            plt.xlim(0, epochs)
+            plt.legend(['output_dim{}_loss'.format(i), 'output_dim{}_acc'.format(i), 'val_output_dim{}_loss'.format(i), 'val_output_dim{}_acc'.format(i)])
+            plt.xlabel('Epochs')
+            plt.ylabel('dimension_loss and accuracy')
+
+        plt.savefig(dimension_fig_file)
+        plt.clf()
+
+
+    model.save('./model_angle_and_dimension_60bins_resnet_epoch{}_direction_angle.h5'.format(epochs))
 
 '''
 with open('./loss_acc_6bins_resnet.json', 'w') as file:
     json.dump(total_eval, file, separators=(',', ':'), indent = 4)
-
-
-#%% evaluate the model 
-print("Running evaluation...")
-dataset.initialize_data('test')
-generator_test = BoxCarsDataGenerator(dataset, "test", batch_size = 1, training_mode=False, generate_y=False)
-#print(generator_test.n)
-
-predictions = model.predict_generator(generator_test, generator_test.n)
-#predictions = model.predict_generator(generator_test, 100)
-print(predictions.shape)
-
-print(" -- Accuracy: %.2f%%"%(single_acc*100))
-print(" -- Track accuracy: %.2f%%"%(tracks_acc*100))
-'''
 

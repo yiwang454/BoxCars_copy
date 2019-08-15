@@ -6,7 +6,7 @@ import numpy as np
 import tempfile
 
 class LearningRateFinder:
-	def __init__(self, model, stopFactor=4, beta=0.98):
+	def __init__(self, model, stopFactor=10, beta=0.98):
 		# store the model, stop factor, and beta value (for computing
 		# a smoothed, average loss)
 		self.model = model
@@ -16,12 +16,12 @@ class LearningRateFinder:
 		# initialize our list of learning rates and losses,
 		# respectively
 		self.lrs = []
-		self.losses = []
+		self.losses = [[] for _ in range(8)]
 
 		# initialize our learning rate multiplier, average loss, best
 		# loss found thus far, current batch number, and weights file
 		self.lrMult = 1
-		self.avgLoss = 0
+		self.avgLoss = [0 for _ in range(8)]
 		self.bestLoss = 1e9
 		self.batchNum = 0
 		self.weightsFile = None
@@ -29,9 +29,9 @@ class LearningRateFinder:
 	def reset(self):
 		# re-initialize all variables from our constructor
 		self.lrs = []
-		self.losses = []
+		self.losses = [[] for _ in range(8)]
 		self.lrMult = 1
-		self.avgLoss = 0
+		self.avgLoss = [0 for _ in range(8)]
 		self.bestLoss = 1e9
 		self.batchNum = 0
 		self.weightsFile = None
@@ -39,8 +39,8 @@ class LearningRateFinder:
 	def is_data_iter(self, data):
 		# define the set of class types we will check for
 		iterClasses = ["NumpyArrayIterator", "DirectoryIterator",
-			 "Iterator", "Sequence"]
-
+			 "Iterator", "Sequence", "BoxCarsDataGenerator"]
+		print(data.__class__.__name__)
 		# return whether our data is an iterator
 		return data.__class__.__name__ in iterClasses
 
@@ -54,31 +54,38 @@ class LearningRateFinder:
 		# number of batches processed, compute the average average
 		# loss, smooth it, and update the losses list with the
 		# smoothed value
-		l = logs["loss"]
+		all_loss = [logs['loss'], logs['output_d_loss'], logs['output_a0_loss'],logs['output_a1_loss'],logs['output_a2_loss'], logs['output_dim0_loss'], logs['output_dim1_loss'],  logs['output_dim2_loss']]
 		self.batchNum += 1
-		self.avgLoss = (self.beta * self.avgLoss) + ((1 - self.beta) * l)
-		smooth = self.avgLoss / (1 - (self.beta ** self.batchNum))
-		self.losses.append(smooth)
+		
+		smooth = [0 for _ in range(8)]
+
+		for i in range(len(self.avgLoss)):
+			self.avgLoss[i] = (self.beta * self.avgLoss[i]) + ((1 - self.beta) * all_loss[i])
+			smooth[i] = self.avgLoss[i] / (1 - (self.beta ** self.batchNum))
+			self.losses[i].append(smooth[i])
 
 		# compute the maximum loss stopping factor value
 		stopLoss = self.stopFactor * self.bestLoss
 
 		# check to see whether the loss has grown too large
-		if self.batchNum > 1 and smooth > stopLoss:
+		if self.batchNum > 1 and smooth[0] > stopLoss:
 			# stop returning and return from the method
 			self.model.stop_training = True
+			print("meeting stop loss, training ends")
 			return
 
 		# check to see if the best loss should be updated
-		if self.batchNum == 1 or smooth < self.bestLoss:
-			self.bestLoss = smooth
+		if self.batchNum == 1 or smooth[0] < self.bestLoss:
+			self.bestLoss = smooth[0]
 
 		# increase the learning rate
 		lr *= self.lrMult
 		K.set_value(self.model.optimizer.lr, lr)
 
+		self.plot_loss()
+
 	def find(self, trainData, startLR, endLR, epochs=None,
-		stepsPerEpoch=None, batchSize=32, sampleSize=2048,
+		stepsPerEpoch=None, batchSize=64, sampleSize=2048,
 		verbose=1):
 		# reset our class-specific variables
 		self.reset()
@@ -155,17 +162,46 @@ class LearningRateFinder:
 		self.model.load_weights(self.weightsFile)
 		K.set_value(self.model.optimizer.lr, origLR)
 
-	def plot_loss(self, skipBegin=10, skipEnd=1, title=""):
+	def plot_loss(self, skipBegin=10, skipEnd=1, title="", loss_lr_path="./losses_lr_resnet50_60bins.png"):
 		# grab the learning rate and losses values to plot
 		lrs = self.lrs[skipBegin:-skipEnd]
-		losses = self.losses[skipBegin:-skipEnd]
+		Legends = ['output_d_loss', 'output_a0_loss', 'output_a1_loss', 'output_a2_loss', 'output_dim0_loss', 'output_dim1_loss', 'output_dim2_loss']
+		
+		for legend, loss in zip(Legends, self.losses[1:]):
+			loss_part = loss[skipBegin:-skipEnd]
 
-		# plot the learning rate vs. loss
-		plt.plot(lrs, losses)
+			# plot the learning rate vs. loss
+			plt.plot(lrs, loss_part, label=legend)
+
 		plt.xscale("log")
 		plt.xlabel("Learning Rate (Log Scale)")
 		plt.ylabel("Loss")
+		plt.legend()
 
 		# if the title is not empty, add it to the plot
 		if title != "":
 			plt.title(title)
+
+		plt.savefig(loss_lr_path)
+		plt.clf()
+
+		loss_part = self.losses[0][skipBegin:-skipEnd]
+
+			# plot the learning rate vs. loss
+		plt.plot(lrs, loss_part, label='loss')
+
+		plt.xscale("log")
+		plt.xlabel("Learning Rate (Log Scale)")
+		plt.ylabel("Loss")
+		plt.legend()
+
+		# if the title is not empty, add it to the plot
+		if title != "":
+			plt.title(title)
+
+		plt.savefig("./loss_lr_resnet50_60bins.png")
+		plt.clf()
+
+
+
+		
