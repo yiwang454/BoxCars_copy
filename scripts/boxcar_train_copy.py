@@ -10,6 +10,7 @@ import keras
 from keras.models import Sequential, Model
 from keras.layers import Input, Dense, Activation,Conv2D, MaxPooling2D, BatchNormalization, Flatten, LeakyReLU
 from keras.applications.resnet50 import ResNet50
+from keras.optimizers import Adadelta
 from keras.callbacks import ModelCheckpoint, TensorBoard
 
 import matplotlib.pyplot as plt
@@ -161,8 +162,9 @@ if using_VGG:
 elif using_resnet:
     model = Model(inputs=model_main.input, outputs=output_list)
 
+optimizer = Adadelta(rho = 0.95)
 model.compile(loss=keras.losses.sparse_categorical_crossentropy,
-              optimizer=keras.optimizers.Adadelta(),
+              optimizer=optimizer,
               metrics=['accuracy'])
 
 ###training

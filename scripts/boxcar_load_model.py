@@ -5,6 +5,7 @@ import os
 import _init_paths
 from math import sin, cos, pi
 import cv2
+import time
 from multiprocessing import Pool
 
 from boxcars_dataset import BoxCarsDataset
@@ -18,13 +19,24 @@ input:  model_path,
 model_path = '/home/vivacityserver6/repos/BoxCars/cache/snapshots/model_3angles_60bins_resnet_008.h5'    #need to modify
 output_path = '/home/vivacityserver6/repos/BoxCars/output/'
 prediction_saved_path = output_path + 'boxcar_3angles_60bins_resnet_008.json'
+vehicle_id_saved_path = output_path + 'vehicle_id.json'
 angle_numbers = 3
 initial_image_idx = 0
 saved_prediction = True
+saved_vehicle_id = False
 batch_size = 64
 part_size = 32
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 
+estimated_3DBB = None
+
+if estimated_3DBB == None:
+    dataset = BoxCarsDataset(load_split="hard", load_atlas=True)
+else:
+    dataset = BoxCarsDataset(load_split="hard", load_atlas=True, 
+                            use_estimated_3DBB = True, estimated_3DBB_path = estimated_3DBB)
+
+dataset.initialize_data('test')
 
 def predictions_for_whole_dataset(model, dataset):
     part_data = dataset.split['test']
@@ -121,46 +133,48 @@ def visualize_prediction_batch(getting_angle, angle_idx, model=None, arrow_visua
         return angles
 
 
+def get_length_thread(id):
+    (vehicle_id, instance_id) = id
+
+    vehicle, instance, bb3d = dataset.get_vehicle_instance_data(vehicle_id, instance_id)
+    diagonal_length = dataset.get_image_diagonal(vehicle_id, instance_id)
+    return (vehicle_id, instance_id, three_normalized_dimensions(bb3d=bb3d, normal_length = diagonal_length))
 
 
-def get_length(dim_idx):
-    estimated_3DBB = None
-
-    if estimated_3DBB == None:
-        dataset = BoxCarsDataset(load_split="hard", load_atlas=True)
-    else:
-        dataset = BoxCarsDataset(load_split="hard", load_atlas=True, 
-                                use_estimated_3DBB = True, estimated_3DBB_path = estimated_3DBB)
-
-    dataset.initialize_data('test')
-
+def get_length():
     part_data = dataset.split['test']
 
-    def get_length_thread(vehicle_id):
-                
-        instances = dataset.dataset["samples"][vehicle_id]["instances"]
+    if saved_vehicle_id:
+        with open(vehicle_id_saved_path, 'r') as json_file:
+            vehicle_instance_id_list = json.load(json_file)
 
-        for instance_id in range(len(instances)):
-                
-            vehicle, instance, bb3d = dataset.get_vehicle_instance_data(vehicle_id, instance_id)
-            diagonal_length = dataset.get_image_diagonal(vehicle_id, instance_id)
-            three_normalized_dimensions(bb3d=bb3d, normal_length = diagonal_length)
+    else:
+        vehicle_instance_id_list = [] # should be a list of tuple of (vehicle_id, instance_id)
+        for vehicle_id, label in part_data:
+            instances = dataset.dataset["samples"][vehicle_id]["instances"]
+            for i in range(len(instances)):
+                vehicle_instance_id_list.append((vehicle_id, i))
+        with open(vehicle_id_saved_path, "w+") as file:
+            json.dump(vehicle_instance_id_list, file, indent = 4)
+        
 
-    vehicle_id_list = []
-    with Pool(5) as p:
-        length = p.map(f, vehicle_id_list)
+    with Pool(8) as p:
+        length_info = p.map(get_length_thread, vehicle_instance_id_list)
 
-    return length
+    return length_info
 
 def main():
     # visualize_prediction_batch(False, 0)
     # visualize_prediction_batch(False, 1)
     # visualize_prediction_batch(False, 2)
 
-    model = load_model(model_path)
+    # model = load_model(model_path)
 
-    visualize_prediction_batch(model, False, 3, False)
-
+    # visualize_prediction_batch(model, False, 3, False)
+    t0 = time.time()
+    length_list = get_length()
+    t1 = time.time()
+    print(t1 - t0)
 
 if __name__ == '__main__':
     main()
