@@ -28,6 +28,8 @@ class BoxCarsDataGenerator(Iterator):
         return self._get_batches_of_transformed_samples(index_array)
 
     def _get_batches_of_transformed_samples(self, index_array):
+        with open('./record_vehicle_id.txt', 'a+') as file:
+            file.write('batch \n')
         x = np.empty([self.batch_size] + list(self.image_size) + [3], dtype=np.float32)
         y1 = np.empty([self.batch_size] + [1], dtype=np.float32)
         y2 = np.empty([self.batch_size] + [1], dtype=np.float32)
@@ -39,6 +41,8 @@ class BoxCarsDataGenerator(Iterator):
 
         for i, ind in enumerate(index_array):
             vehicle_id, instance_id = self.dataset.X[self.part][ind]
+            with open('./record_vehicle_id.txt', 'a+') as file:
+                file.write('(' + str(vehicle_id) + ', ' + str(instance_id) + '), ')
             '''
             #might be used to check how image data has been shuffled and fed in
             if vehicle_id in self.check_repeatation.keys():
@@ -66,6 +70,9 @@ class BoxCarsDataGenerator(Iterator):
             y5[i, ...] = self.dataset.Y[self.part][ind][4]
             y6[i, ...] = self.dataset.Y[self.part][ind][5]
             y7[i, ...] = self.dataset.Y[self.part][ind][6]
+
+        with open('./record_vehicle_id.txt', 'a+') as file:
+            file.write('\n')
 
         if not self.generate_y:
             return x

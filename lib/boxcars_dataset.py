@@ -45,6 +45,7 @@ class BoxCarsDataset(object):
         returns decoded image from atlas in RGB channel order
         """
         image = cv2.cvtColor(cv2.imdecode(self.atlas[vehicle_id][instance_id], 1), cv2.COLOR_BGR2RGB)
+
         return image_preprocess(image)
         #cv2.resize(image, (224, 224), interpolation=cv2.INTER_AREA)
         
