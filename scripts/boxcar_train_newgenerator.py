@@ -4,8 +4,7 @@ import json
 from utils import ensure_dir, parse_args
 from learningratefinder import LearningRateFinder
 
-from boxcars_dataset import BoxCarsDataset
-from boxcars_data_generator import BoxCarsDataGenerator
+from boxcars_datagen import BoxImageGenerator
 
 import keras
 from keras.models import Sequential, Model, load_model
@@ -16,7 +15,7 @@ from keras.callbacks import ModelCheckpoint, TensorBoard, LambdaCallback, Termin
 
 import matplotlib.pyplot as plt
 
-batch_size = 1
+batch_size = 64
 epochs = 15
 direction_number = 2
 angle_bin_number = 60
@@ -39,14 +38,17 @@ losses_fig = "./losses_60bins_resnet_adam.png"
 acc_fig = "./acc_60bins_resnet_adam.png"
 lr_search = False
 
+image_dir_train = '/home/vivacityserver6/datasets/BoxCars116k/ims_train'
+anns_dir_train = '/home/vivacityserver6/datasets/BoxCars116k/anns_train'
+
 class LossHistory(keras.callbacks.Callback):
     def on_train_begin(self, logs={}):
         self.labels = ['loss', 'output_d_loss', 'output_a0_loss', 'output_dim0_loss', 'output_d_acc', ' output_a0_acc', 'output_dim0_acc']
         self.losses = [[] for _ in range(len(self.labels))]
-        self.batch_period = 1
+        self.batch_period = 100
         self.period_loss = []
         self.epoch_number = 0
-        self.steps = 51691
+        self.steps = 807
 
     # def on_batch_begin(self, batch, logs={}):
     #     with open('./record_vehicle_id.txt', 'a+') as file:
@@ -209,12 +211,6 @@ def VGG_model():
     # model_main.add(BatchNormalization())
     return model_main
 
-if estimated_3DBB is None:
-    dataset = BoxCarsDataset(load_split='hard', load_atlas=True)
-else:
-    dataset = BoxCarsDataset(load_split='hard', load_atlas=True, 
-                             use_estimated_3DBB = True, estimated_3DBB_path = estimated_3DBB)
-
 snapshots_dir = os.path.join(cache, "snapshots")
 tensorboard_dir = os.path.join(cache, "tensorboard")
 loss_history = LossHistory()
@@ -265,16 +261,14 @@ model.compile(loss='sparse_categorical_crossentropy',
 
 ###training
 
-#initialize dataset for training
-dataset.initialize_data("train")
-dataset.initialize_data("validation")
+
 
 with open('./record_vehicle_id.txt', 'a+') as file:
     file.write('start============================================== \n')
 
 for i in range(epochs):
-    generator_train = BoxCarsDataGenerator(dataset, "train", batch_size, training_mode=True)
-    generator_val = BoxCarsDataGenerator(dataset, "validation", batch_size, training_mode=False)
+    generator_train = BoxImageGenerator(datamode="train", batch_size=batch_size, image_dir=image_dir_train)
+    generator_val = BoxImageGenerator(datamode="validation", batch_size=batch_size, image_dir=image_dir_val)
 
     #%% callbacks
     ensure_dir(tensorboard_dir)

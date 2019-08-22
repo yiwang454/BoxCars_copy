@@ -34,7 +34,8 @@ def image_drop(img, change_probability = 0.6):
 
 #%%
 def add_bb_noise_flip(image, bb3d, flip, bb_noise):
-    bb3d = bb3d + bb_noise 
+    if not bb_noise == None: 
+        bb3d = bb3d + bb_noise 
     if flip:
         bb3d[:, 0] = image.shape[1] - bb3d[:,0]
         image = cv2.flip(image, 1)

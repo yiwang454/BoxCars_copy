@@ -3,7 +3,7 @@ import numpy as np
 import json
 import os
 import _init_paths
-from math import sin, cos, pi
+from math import sin, cos, pi, sqrt
 import cv2
 import time
 from multiprocessing import Pool
@@ -36,7 +36,7 @@ else:
     dataset = BoxCarsDataset(load_split="hard", load_atlas=True, 
                             use_estimated_3DBB = True, estimated_3DBB_path = estimated_3DBB)
 
-dataset.initialize_data('test')
+dataset.initialize_data('train')
 
 def predictions_for_whole_dataset(model, dataset):
     part_data = dataset.split['test']
@@ -135,14 +135,17 @@ def visualize_prediction_batch(getting_angle, angle_idx, model=None, arrow_visua
 
 def get_length_thread(id):
     (vehicle_id, instance_id) = id
-
+    
     vehicle, instance, bb3d = dataset.get_vehicle_instance_data(vehicle_id, instance_id)
-    diagonal_length = dataset.get_image_diagonal(vehicle_id, instance_id)
-    return (vehicle_id, instance_id, three_normalized_dimensions(bb3d=bb3d, normal_length = diagonal_length))
+    bb2d = instance["2DBB"]
+    diagonal_length = sqrt(bb2d[2] ** 2 + bb2d[3] ** 2)
+    return three_normalized_dimensions(bb3d=bb3d, normal_length = diagonal_length)
 
 
 def get_length():
-    part_data = dataset.split['test']
+    part_data = dataset.split['train']
+    with open('./only_image_id.txt', 'r') as file:
+        filtered_list = file.read().splitlines()
 
     if saved_vehicle_id:
         with open(vehicle_id_saved_path, 'r') as json_file:
@@ -153,7 +156,9 @@ def get_length():
         for vehicle_id, label in part_data:
             instances = dataset.dataset["samples"][vehicle_id]["instances"]
             for i in range(len(instances)):
-                vehicle_instance_id_list.append((vehicle_id, i))
+                if str(vehicle_id) + '_' +  str(i) in filtered_list:
+                    vehicle_instance_id_list.append((vehicle_id, i))
+                    
         with open(vehicle_id_saved_path, "w+") as file:
             json.dump(vehicle_instance_id_list, file, indent = 4)
         
@@ -161,7 +166,12 @@ def get_length():
     with Pool(8) as p:
         length_info = p.map(get_length_thread, vehicle_instance_id_list)
 
-    return length_info
+    rearranged_info = [[] for _ in range(3)]
+    for info in length_info:
+        for i in range(3):
+            rearranged_info[i].append(info[i])
+
+    return rearranged_info
 
 def main():
     # visualize_prediction_batch(False, 0)

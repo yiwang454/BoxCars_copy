@@ -105,12 +105,12 @@ def cross_from_points(bb3d, img=None):
     colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
     angles = []
     for f, b, color in zip(front_lines, back_lines, colors):
-        L1 = line(bb3d[f[0], :], bb3d[f[1], :])
-        L2 = line(bb3d[f[2], :], bb3d[f[3], :])
+        L1 = line(bb3d[f[0]], bb3d[f[1]])
+        L2 = line(bb3d[f[2]], bb3d[f[3]])
         R12 = intersection(L1, L2)
 
-        L3 = line(bb3d[b[0], :], bb3d[b[1], :])
-        L4 = line(bb3d[b[2], :], bb3d[b[3], :])
+        L3 = line(bb3d[b[0]], bb3d[b[1]])
+        L4 = line(bb3d[b[2]], bb3d[b[3]])
         R34 = intersection(L3, L4)
 
         if img is not None:
@@ -130,15 +130,16 @@ def three_normalized_dimensions(bb3d, normal_length = 1):
     front_lines = [(0, 5, 1, 4), (1, 6, 2, 5), (0, 2, 1, 3)]
     back_lines = [(3, 6, 2, 7), (3, 4, 0, 7), (4, 6, 5, 7)]
     for f, b in zip(front_lines, back_lines):
-        L1 = line(bb3d[f[0], :], bb3d[f[1], :])
-        L2 = line(bb3d[f[2], :], bb3d[f[3], :])
+        L1 = line(bb3d[f[0]], bb3d[f[1]])
+        L2 = line(bb3d[f[2]], bb3d[f[3]])
         R12 = intersection(L1, L2)
 
-        L3 = line(bb3d[b[0], :], bb3d[b[1], :])
-        L4 = line(bb3d[b[2], :], bb3d[b[3], :])
+        L3 = line(bb3d[b[0]], bb3d[b[1]])
+        L4 = line(bb3d[b[2]], bb3d[b[3]])
         R34 = intersection(L3, L4)
         norm_len = get_length_from_points(R12, R34) / normal_length
         dimensions.append(floor(norm_len / 0.015))
+        #dimensions.append(norm_len)
     
     return dimensions
 

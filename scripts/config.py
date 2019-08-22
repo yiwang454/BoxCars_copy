@@ -10,3 +10,9 @@ BOXCARS_DATASET = os.path.join(BOXCARS_DATASET_ROOT, "dataset.pkl")
 BOXCARS_ATLAS = os.path.join(BOXCARS_DATASET_ROOT, "atlas.pkl")
 BOXCARS_CLASSIFICATION_SPLITS = os.path.join(BOXCARS_DATASET_ROOT, "classification_splits.pkl")
 
+BOXCARS_LIST_TRAIN = os.path.join(BOXCARS_DATASET_ROOT, "list", "training.txt")
+BOXCARS_LIST_TEST = os.path.join(BOXCARS_DATASET_ROOT, "list", "test.txt")
+BOXCARS_LIST_VAL = os.path.join(BOXCARS_DATASET_ROOT, "list", "validation.txt") 
+
+
+

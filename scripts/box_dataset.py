@@ -1,5 +1,7 @@
 import _init_paths
 
+import json
+
 from boxcars_dataset import BoxCarsDataset
 from boxcars_data_generator import BoxCarsDataGenerator
 
@@ -8,7 +10,7 @@ import seaborn as sns
 import pandas as pd
 
 dataset = BoxCarsDataset(load_split="hard", load_atlas=True)
-DATA_ROOT = "/home/vivacity/datasets/boxcar116k"
+DATA_ROOT = "/home/vivacityserver6/datasets/BoxCars116k/"
 
 import uuid
 import cv2
@@ -104,8 +106,8 @@ def draw_bbs(vehicle_id, instance):
     plt.show()
 
 try:
-    os.mkdir('/home/vivacity/datasets/boxcar116k/anns/')
-    os.mkdir('/home/vivacity/datasets/boxcar116k/ims/')
+    os.mkdir('/home/vivacityserver6/datasets/BoxCars116k/anns_val/')
+    os.mkdir('/home/vivacityserver6/datasets/BoxCars116k/ims_val/')
 except:
     pass
 
@@ -154,12 +156,88 @@ def parse_vehicle(vehicle_id):
                                                  angles[2], to_camera))
 
         img = dataset.get_image(vehicle_id, i)
-        img_crop = img[bb2d[0]:bb2d[0] + bb2d[3], bb2d[1]:bb2d[1] + bb2d[2], :]
+        img_crop = img[bb2d[1]:bb2d[1] + bb2d[3], bb2d[0]:bb2d[0] + bb2d[2], :]
         im = Image.fromarray(img_crop)
         im.save("{0}/ims/{1}.png".format(DATA_ROOT, filename))
 
+def parse_vehicle_filter(vehicle_id, folder):
+    vehicle, instance_, bb3d_ = dataset.get_vehicle_instance_data(
+        vehicle_id, 0)
+
+    vehicle_class = vehicle["annotation"]
+    # brand, model, vehicle_type, mk = vehicle_class.split(' ')
+    to_camera = vehicle["to_camera"]
+    if to_camera:
+        to_camera = 1
+    else:
+        to_camera = 0
+
+    for instance_id in range(len(vehicle["instances"])):
+        instance = vehicle["instances"][instance_id]
+        bb2d = instance["2DBB"]
+        bb3d = instance["3DBB"]
+        offset = instance["3DBB_offset"]
+        angles = cross_from_points(bb3d)
+        ar = bb2d[3] / bb2d[2]
+        aspect_judge = not (abs(ar-1.0) < 0.1 and abs(angles[0]) < 50*np.pi/180)
+        if aspect_judge and (bb2d[2] > 50 and bb2d[3] > 50): 
+            
+            filename = str(vehicle_id) + '_' + str(instance_id)
+            
+            info = {'bb2d' : bb2d.tolist(), 'bb3d' : bb3d.tolist(), '3d_offset': offset.tolist()}
+            info['class'] = vehicle_class
+            info['to_camera'] = to_camera
+            with open("{}/anns_val/{}/{}.txt".format(DATA_ROOT, folder, filename), 'w') as file:
+                json.dump(info, file, indent=4)
+
+            img = dataset.get_image(vehicle_id, instance_id)
+            img_crop = img[bb2d[1]:bb2d[1] + bb2d[3], bb2d[0]:bb2d[0] + bb2d[2], :]
+            im = Image.fromarray(img_crop)
+            im.save("{}/ims_val/{}/{}.png".format(DATA_ROOT, folder, filename))
+
+        # # for comparison purpose
+        # if aspect_judge: 
+            
+        #     filename = str(vehicle_id) + '_' + str(instance_id)
+            
+        #     img = dataset.get_image(vehicle_id, instance_id)
+        #     img_crop = img[bb2d[0]:bb2d[0] + bb2d[3], bb2d[1]:bb2d[1] + bb2d[2], :]
+        #     im = Image.fromarray(img_crop)
+        #     im.save("{0}/comparison/{1}.png".format(DATA_ROOT, filename))
+
 
 all_vehicles = len(dataset.dataset["samples"])
-for i in range(all_vehicles):
-    print("{0}/{1}".format(i, all_vehicles))
-    parse_vehicle(i)
+
+dataset.initialize_data("validation")
+
+part_data = dataset.split['validation']
+# print(len(part_data))
+
+# intervals = list(map(lambda q: [2000 * q, 2000 * (q+1)], list(range(6))))
+
+# for [left, right] in intervals:
+#     try:
+#         os.mkdir("{0}/ims_val/{1}_{2}".format(DATA_ROOT, left, right))
+#         os.mkdir("{0}/anns_val/{1}_{2}".format(DATA_ROOT, left, right))
+#     except:
+#         pass
+
+
+for idx, (vehicle_id, label) in enumerate(part_data):
+    # for [left, right] in intervals:
+    #     if idx in range(left, right):
+    #         folder = '{}_{}'.format(left, right)
+    
+    parse_vehicle_filter(vehicle_id, '')
+        
+
+
+# instance_number = 0
+# for idx, (vehicle_id, label) in enumerate(part_data):
+
+#     if idx in range(8000, 10000):
+#         vehicle, instance_, bb3d_ = dataset.get_vehicle_instance_data(vehicle_id, 0)
+#         instance_number += len(vehicle["instances"])
+
+
+# print(instance_number)
