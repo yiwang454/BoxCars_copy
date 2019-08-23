@@ -7,6 +7,8 @@ from math import sin, cos, pi, sqrt
 import cv2
 import time
 from multiprocessing import Pool
+from boxcars_datagen import BoxImageGenerator
+
 
 from boxcars_dataset import BoxCarsDataset
 from boxcars_data_generator import BoxCarsDataGenerator
@@ -16,13 +18,13 @@ from utils import cross_from_points, get_true_angle, get_angle_from_prediction, 
 input:  model_path,    
 '''
 
-model_path = '/home/vivacityserver6/repos/BoxCars/cache/snapshots/model_3angles_60bins_resnet_008.h5'    #need to modify
+model_path = '/home/vivacityserver6/repos/BoxCars/model_try_new_gen001.h5'    #need to modify
 output_path = '/home/vivacityserver6/repos/BoxCars/output/'
-prediction_saved_path = output_path + 'boxcar_3angles_60bins_resnet_008.json'
-vehicle_id_saved_path = output_path + 'vehicle_id.json'
-angle_numbers = 3
+prediction_saved_path = output_path + 'boxcar_fullmodel_debug_again.json'
+# vehicle_id_saved_path = output_path + 'vehicle_id.json'
+angle_numbers = 60
 initial_image_idx = 0
-saved_prediction = True
+saved_prediction = False
 saved_vehicle_id = False
 batch_size = 64
 part_size = 32
@@ -36,40 +38,34 @@ else:
     dataset = BoxCarsDataset(load_split="hard", load_atlas=True, 
                             use_estimated_3DBB = True, estimated_3DBB_path = estimated_3DBB)
 
-dataset.initialize_data('train')
-
-def predictions_for_whole_dataset(model, dataset):
-    part_data = dataset.split['test']
-    predictions = {}
-    i = 0
-    for vehicle_id, label in part_data:
-        instances = dataset.dataset["samples"][vehicle_id]["instances"]  
-        predictions[vehicle_id] = {}
-        for instance_id in range(len(instances)):
-            vehicle, instance, bb3d = dataset.get_vehicle_instance_data(vehicle_id, instance_id)
-            image = dataset.get_image(vehicle_id, instance_id)
-
-            image = (image.astype(np.float32) - 116)/128.
-
-            image.resize((1, image.shape[0],image.shape[1], image.shape[2]))
-            prediction_img = model.predict_on_batch(image)
-
-            prediction_per_image = {}
-
-            prediction_per_image['output_d'] = prediction_img[0].tolist()[0]
-            prediction_per_image['output_a0'] = prediction_img[1].tolist()[0]
-            prediction_per_image['output_a1'] = prediction_img[2].tolist()[0]
-            prediction_per_image['output_a2'] = prediction_img[3].tolist()[0]
+image_dir_train = '/home/vivacityserver6/datasets/BoxCars116k/ims_train'
+image_dir_val = '/home/vivacityserver6/datasets/BoxCars116k/ims_val'
 
 
-            if i < 5:
-                print(vehicle_id, instance_id, prediction_per_image)
-            
-            predictions[vehicle_id][instance_id] = prediction_per_image
-        i += 1
+def predictions_for_whole_dataset(model, datagenerator, tra_generator):
+    predictions = model.predict_generator(datagenerator, verbose=1)
+    predictions_train = model.predict_generator(tra_generator, verbose=1)
 
-    with open(prediction_saved_path, "w+") as write_file:
-        json.dump(predictions, write_file, separators=(',', ':'), indent = 4)
+    for i, prediction in enumerate(predictions):
+        for j in range(prediction.shape[0]):
+            for k in range(prediction.shape[1]):
+                if abs(prediction[j][k] - predictions_train[i][j][k] > 0.001):
+                    print('error occur', prediction[j][k], predictions_train[i][j][k])
+
+    '''
+    running result:
+    639/639 [==============================] - 89s 139ms/step
+    639/639 [==============================] - 87s 135ms/step
+    root@bd787c25d055:/home/vivacityserver6/repos/BoxCars# 
+    which means no error occur
+    '''
+
+    # if os.path.exists(prediction_saved_path):
+    #     os.remove(prediction_saved_path)
+
+    # with open(prediction_saved_path, "a+") as write_file:
+    #     for prediction in predictions:
+    #         json.dump(prediction.tolist(), write_file, separators=(',', ':'), indent = 4)
 
     return predictions
 
@@ -175,16 +171,15 @@ def get_length():
 
 def main():
     # visualize_prediction_batch(False, 0)
-    # visualize_prediction_batch(False, 1)
-    # visualize_prediction_batch(False, 2)
+    train_generator = BoxImageGenerator('validation', 64, image_dir=image_dir_val, shuffle=False)
+    train_generator_2 = BoxImageGenerator('validation', 64, image_dir=image_dir_val, training_mode = True, shuffle=False)
 
-    # model = load_model(model_path)
+    '''
+    no error occur both when setting datamode to be training or validation
+    '''
 
-    # visualize_prediction_batch(model, False, 3, False)
-    t0 = time.time()
-    length_list = get_length()
-    t1 = time.time()
-    print(t1 - t0)
+    model = load_model(model_path)
+    predictions_for_whole_dataset(model, train_generator, train_generator_2)
 
 if __name__ == '__main__':
     main()

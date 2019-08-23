@@ -16,7 +16,7 @@ from keras.callbacks import ModelCheckpoint, TensorBoard, LambdaCallback, Termin
 import matplotlib.pyplot as plt
 
 batch_size = 48
-epochs = 60
+epochs = 30
 direction_number = 2
 angle_bin_number = 60
 angle_number = 3
@@ -28,9 +28,9 @@ using_VGG = False
 using_resnet = True
 continue_train = False
 cache = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "cache"))
-snapshots_file = "model_resnet60_adam{epoch:03d}.h5"
+snapshots_file = "model_resnet60_adam_diff_normalize{epoch:03d}.h5"
 latest_model_path = ""
-output_path = "./output_classic_setting"
+output_path = "./output_diff_normalize"
 if not os.path.exists(output_path):
     os.mkdir(output_path)
 angle_fig_file = output_path + "/loss_acc_3angles_60bins_resnet.png"
@@ -247,51 +247,6 @@ def VGG_model():
     # model_main.add(BatchNormalization())
     return model_main
 
-
-def resnet_layer(inputs,
-                 num_filters=16,
-                 kernel_size=3,
-                 strides=1,
-                 activation='relu',
-                 batch_normalization=True,
-                 conv_first=True):
-    """2D Convolution-Batch Normalization-Activation stack builder
-
-    # Arguments
-        inputs (tensor): input tensor from input image or previous layer
-        num_filters (int): Conv2D number of filters
-        kernel_size (int): Conv2D square kernel dimensions
-        strides (int): Conv2D square stride dimensions
-        activation (string): activation name
-        batch_normalization (bool): whether to include batch normalization
-        conv_first (bool): conv-bn-activation (True) or
-            bn-activation-conv (False)
-
-    # Returns
-        x (tensor): tensor as input to the next layer
-    """
-    conv = Conv2D(num_filters,
-                  kernel_size=kernel_size,
-                  strides=strides,
-                  padding='same',
-                  kernel_initializer='he_normal',
-                  kernel_regularizer=l2(1e-4))
-
-    x = inputs
-    if conv_first:
-        x = conv(x)
-        if batch_normalization:
-            x = BatchNormalization()(x)
-        if activation is not None:
-            x = Activation(activation)(x)
-    else:
-        if batch_normalization:
-            x = BatchNormalization()(x)
-        if activation is not None:
-            x = Activation(activation)(x)
-        x = conv(x)
-    return x
-
 snapshots_dir = os.path.join(cache, "snapshots")
 tensorboard_dir = os.path.join(cache, "tensorboard")
 loss_history = LossHistory()
@@ -307,19 +262,15 @@ elif using_resnet:
     
 direction_output = Dense(direction_number, activation = 'softmax', name='output_d')(x)
 
-def three_reslayer(x_tensor):
-    y_tensor = resnet_layer(inputs=x_tensor)
-    y_tensor = resnet_layer(inputs=y_tensor)
-    y_tensor = resnet_layer(inputs=y_tensor)
-    return y_tensor
+# angle_0_output_previous = Dense(500, activation="relu")(x)
 
-angle_0_output = Dense(angle_bin_number, activation = 'softmax', name='output_a0')(three_reslayer(x))
-angle_1_output = Dense(angle_bin_number, activation = 'softmax', name='output_a1')(three_reslayer(x))
-angle_2_output = Dense(angle_bin_number, activation = 'softmax', name='output_a2')(three_reslayer(x))
+angle_0_output = Dense(angle_bin_number, activation = 'softmax', name='output_a0')(x)
+angle_1_output = Dense(angle_bin_number, activation = 'softmax', name='output_a1')(x)
+angle_2_output = Dense(angle_bin_number, activation = 'softmax', name='output_a2')(x)
 
-dimension_0_output = Dense(dimension_bin_number, activation = 'softmax', name='output_dim0')(three_reslayer(x))
-dimension_1_output = Dense(dimension_bin_number, activation = 'softmax', name='output_dim1')(three_reslayer(x))
-dimension_2_output = Dense(dimension_bin_number, activation = 'softmax', name='output_dim2')(three_reslayer(x))
+dimension_0_output = Dense(dimension_bin_number, activation = 'softmax', name='output_dim0')(x)
+dimension_1_output = Dense(dimension_bin_number, activation = 'softmax', name='output_dim1')(x)
+dimension_2_output = Dense(dimension_bin_number, activation = 'softmax', name='output_dim2')(x)
 
 output_list = [direction_output, 
                angle_0_output, 
@@ -348,8 +299,8 @@ model.compile(loss='categorical_crossentropy',
 
 ###training
 
-generator_train = BoxImageGenerator(datamode="train", batch_size=batch_size, image_dir=image_dir_train, training_mode=True)
-generator_val = BoxImageGenerator(datamode="validation", batch_size=batch_size, image_dir=image_dir_val, training_mode=False)
+generator_train = BoxImageGenerator(datamode="train", batch_size=batch_size, image_dir=image_dir_train, training_mode=True, diff_normalize=True)
+generator_val = BoxImageGenerator(datamode="validation", batch_size=batch_size, image_dir=image_dir_val, training_mode=False, diff_normalize=True)
 
 #%% callbacks
 ensure_dir(tensorboard_dir)
@@ -386,7 +337,7 @@ else:
                             
     # history = h.history
 
-    model.save('./model_angle_and_dimension_60bins_resnet_epoch{}.h5'.format(epochs))
+    model.save('./model_60bins_resnet_diff_normalize_epoch{}.h5'.format(epochs))
 
 # with open('./loss_acc_6bins_resnet.json', 'w') as file:
 #     json.dump(total_eval, file, separators=(',', ':'), indent = 4)

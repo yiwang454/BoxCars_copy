@@ -28,16 +28,19 @@ using_VGG = False
 using_resnet = True
 continue_train = False
 cache = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "cache"))
-snapshots_file = "model_try_new_gen{epoch:03d}.h5"
+snapshots_file = "model_resnet60_adam{epoch:03d}.h5"
 latest_model_path = ""
-angle_fig_file = "./loss_acc_3angles_60bins_resnet.png"
-dimension_fig_file = "./loss_acc_3dimesnions_60bins_resnet.png"
+output_path = "./output_classic_setting"
+if not os.path.exists(output_path):
+    os.mkdir(output_path)
+angle_fig_file = output_path + "/loss_acc_3angles_60bins_resnet.png"
+dimension_fig_file = output_path + "/loss_acc_3dimesnions_60bins_resnet.png"
 
-loss_fig = "./loss_60bins_resnet_adam.png"
-losses_fig = "./losses_60bins_resnet_adam.png"
-acc_fig = "./acc_60bins_resnet_adam.png"
-val_loss_fig = "./valloss_60bins_resnet_adam.png"
-val_losses_fig = "./vallosses_60bins_resnet_adam.png"
+loss_fig = output_path + "/loss_60bins_resnet_adam.png"
+losses_fig = output_path + "/losses_60bins_resnet_adam.png"
+acc_fig = output_path + "/acc_60bins_resnet_adam.png"
+val_loss_fig = output_path + "/valloss_60bins_resnet_adam.png"
+val_losses_fig = output_path + "/vallosses_60bins_resnet_adam.png"
 
 lr_search = False
 
@@ -303,7 +306,7 @@ generator_val = BoxImageGenerator(datamode="validation", batch_size=batch_size, 
 ensure_dir(tensorboard_dir)
 ensure_dir(snapshots_dir)
 #tb_callback = TensorBoard(tensorboard_dir, histogram_freq=0, write_graph=True, write_images=True)
-saver_callback = ModelCheckpoint(os.path.join(snapshots_dir, snapshots_file), period=1)
+saver_callback = ModelCheckpoint(os.path.join(snapshots_dir, snapshots_file), period=5)
 terminate = TerminateOnNaN()
 
 
@@ -334,7 +337,7 @@ else:
                             
     # history = h.history
 
-    model.save('./model_angle_and_dimension_60bins_resnet_epoch{}_direction_angle.h5'.format(epochs))
+    model.save('./model_angle_and_dimension_60bins_resnet_epoch{}.h5'.format(epochs))
 
 # with open('./loss_acc_6bins_resnet.json', 'w') as file:
 #     json.dump(total_eval, file, separators=(',', ':'), indent = 4)
@@ -342,67 +345,3 @@ else:
 '''
 previous plot code
 '''
-        # # angle loss and accuracy
-        # for i, angle_loss in enumerate(output_angle_loss):
-        #     key = 'output_a{}_loss'.format(i)
-        #     angle_loss.extend(history[key])
-
-        # for i, angle_acc in enumerate(output_angle_acc):
-        #     key = 'output_a{}_acc'.format(i)
-        #     angle_acc.extend(history[key])
-
-        # for i, val_angle_loss in enumerate(val_output_angle_loss):
-        #     key = 'val_output_a{}_loss'.format(i)
-        #     val_angle_loss.extend(history[key])
-
-        # for i, val_angle_acc in enumerate(val_output_angle_acc):
-        #     key = 'val_output_a{}_acc'.format(i)
-        #     val_angle_acc.extend(history[key])
-
-
-        # # dimension loss and accuracy
-        # for i, dimension_loss in enumerate(output_dimension_loss):
-        #     key = 'output_dim{}_loss'.format(i)
-        #     dimension_loss.extend(history[key])
-
-        # for i, dimension_acc in enumerate(output_dimension_acc):
-        #     key = 'output_dim{}_acc'.format(i)
-        #     dimension_acc.extend(history[key])
-
-        # for i, val_dimension_loss in enumerate(val_output_dimension_loss):
-        #     key = 'val_output_dim{}_loss'.format(i)
-        #     val_dimension_loss.extend(history[key])
-
-        # for i, val_dimension_acc in enumerate(val_output_dimension_acc):
-        #     key = 'val_output_dim{}_acc'.format(i)
-        #     val_dimension_acc.extend(history[key])
-
-
-        # plt.figure(figsize=(24, 6))
-        # for i in range(angle_number):
-        #     plt.subplot(1, angle_number, i + 1)
-        #     plt.plot(epochs_list, output_angle_loss[i], 'r--')
-        #     plt.plot(epochs_list, output_angle_acc[i], 'r-')
-        #     plt.plot(epochs_list, val_output_angle_loss[i], 'b--')
-        #     plt.plot(epochs_list, val_output_angle_acc[i], 'b-')
-        #     plt.xlim(0, epochs)
-        #     plt.legend(['output_a{}_loss'.format(i), 'output_a{}_acc'.format(i), 'val_output_a{}_loss'.format(i), 'val_output_a{}_acc'.format(i)])
-        #     plt.xlabel('Epochs')
-        #     plt.ylabel('angle_loss and accuracy')
-        # plt.savefig(angle_fig_file)
-        # plt.clf()
-
-        # plt.figure(figsize=(24, 6))
-        # for i in range(dimension_number):
-        #     plt.subplot(1, dimension_number, i + 1)
-        #     plt.plot(epochs_list, output_dimension_loss[i], 'r--')
-        #     plt.plot(epochs_list, output_dimension_acc[i], 'r-')
-        #     plt.plot(epochs_list, val_output_dimension_loss[i], 'b--')
-        #     plt.plot(epochs_list, val_output_dimension_acc[i], 'b-')
-        #     plt.xlim(0, epochs)
-        #     plt.legend(['output_dim{}_loss'.format(i), 'output_dim{}_acc'.format(i), 'val_output_dim{}_loss'.format(i), 'val_output_dim{}_acc'.format(i)])
-        #     plt.xlabel('Epochs')
-        #     plt.ylabel('dimension_loss and accuracy')
-
-        # plt.savefig(dimension_fig_file)
-        # plt.clf()
