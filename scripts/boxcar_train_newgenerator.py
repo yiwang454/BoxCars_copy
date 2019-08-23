@@ -15,8 +15,8 @@ from keras.callbacks import ModelCheckpoint, TensorBoard, LambdaCallback, Termin
 
 import matplotlib.pyplot as plt
 
-batch_size = 64
-epochs = 15
+batch_size = 48
+epochs = 60
 direction_number = 2
 angle_bin_number = 60
 angle_number = 3
@@ -28,7 +28,7 @@ using_VGG = False
 using_resnet = True
 continue_train = False
 cache = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "cache"))
-snapshots_file = "model_3angles_and_dimensions_60bins_resnet_SGD_{epoch:03d}.h5"
+snapshots_file = "model_try_new_gen{epoch:03d}.h5"
 latest_model_path = ""
 angle_fig_file = "./loss_acc_3angles_60bins_resnet.png"
 dimension_fig_file = "./loss_acc_3dimesnions_60bins_resnet.png"
@@ -36,19 +36,27 @@ dimension_fig_file = "./loss_acc_3dimesnions_60bins_resnet.png"
 loss_fig = "./loss_60bins_resnet_adam.png"
 losses_fig = "./losses_60bins_resnet_adam.png"
 acc_fig = "./acc_60bins_resnet_adam.png"
+val_loss_fig = "./valloss_60bins_resnet_adam.png"
+val_losses_fig = "./vallosses_60bins_resnet_adam.png"
+
 lr_search = False
 
 image_dir_train = '/home/vivacityserver6/datasets/BoxCars116k/ims_train'
 anns_dir_train = '/home/vivacityserver6/datasets/BoxCars116k/anns_train'
+image_dir_val = '/home/vivacityserver6/datasets/BoxCars116k/ims_val'
 
 class LossHistory(keras.callbacks.Callback):
     def on_train_begin(self, logs={}):
         self.labels = ['loss', 'output_d_loss', 'output_a0_loss', 'output_dim0_loss', 'output_d_acc', ' output_a0_acc', 'output_dim0_acc']
         self.losses = [[] for _ in range(len(self.labels))]
+
+        self.epoch_labels = ['loss', 'val_loss', 'val_output_d_loss', 'val_output_a0_loss', 'val_output_dim0_loss', 'val_output_d_acc', 'val_output_a0_acc', 'val_output_d0_acc']
+        self.epoch_logs = [[] for _ in range(len(self.epoch_labels))]
+
         self.batch_period = 100
         self.period_loss = []
         self.epoch_number = 0
-        self.steps = 807
+        self.steps = 852
 
     # def on_batch_begin(self, batch, logs={}):
     #     with open('./record_vehicle_id.txt', 'a+') as file:
@@ -103,10 +111,6 @@ class LossHistory(keras.callbacks.Callback):
         #             stored_train_loss[self.labels[i]] = list(map(lambda x: float(x), self.losses[i]))
         #         with open('./train_loss_history.json', 'w+') as file:
         #             json.dump(stored_train_loss, file, indent=4)
-
-
-        
-
         
 
     def on_epoch_begin(self, epoch, logs={}):
@@ -114,12 +118,41 @@ class LossHistory(keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs={}):
         epoch_history = {'epoch': epoch, 'logs': logs}
-        with open('./train_history.json', 'a+') as file:
+        with open('./train_history.json', 'w+') as file:
             json.dump(epoch_history, file, indent=4)
-        # if epoch == 1:
-        #     K.set_value(self.model.optimizer.lr, 1e-6)
-        # if epoch == 2:
-        #     K.set_value(self.model.optimizer.lr, 1e-7)         
+        
+        for idx, loss in enumerate(self.epoch_logs):
+            loss.append(logs.get(self.epoch_labels[idx]))
+
+        epoch_list = list(range(epoch + 1))
+        logs.get(self.epoch_labels[idx])
+
+        plt.plot(epoch_list, self.epoch_logs[0], 'r-', label=self.epoch_labels[0], linewidth=2)
+        plt.plot(epoch_list, self.epoch_logs[1], 'r--', label=self.epoch_labels[1], linewidth=1)
+
+        plt.xlabel("batches")
+        plt.ylabel("Loss")
+        plt.legend()
+
+        plt.savefig(val_loss_fig)
+        plt.clf()
+
+        for idx, linestyle in zip([2, 3, 4, 5, 6, 7], ['b-', 'g-', 'y-', 'b--', 'g--', 'y--']):
+            plt.plot(epoch_list, self.epoch_logs[idx], linestyle, label=self.epoch_labels[idx], linewidth=1)
+            
+        plt.xlabel("batches")
+        plt.ylabel("Accuracy and loss")
+        plt.legend()
+
+        plt.savefig(val_losses_fig)
+        plt.clf()      
+
+
+        if (epoch+1) % 15 == 0:
+            print('epoch: ', epoch, 'changing learning rate')
+            current_lr = K.get_value(self.model.optimizer.lr)
+            K.set_value(self.model.optimizer.lr, current_lr * 0.1)
+     
 
 
         
@@ -226,6 +259,8 @@ elif using_resnet:
     
 direction_output = Dense(direction_number, activation = 'softmax', name='output_d')(x)
 
+# angle_0_output_previous = Dense(500, activation="relu")(x)
+
 angle_0_output = Dense(angle_bin_number, activation = 'softmax', name='output_a0')(x)
 angle_1_output = Dense(angle_bin_number, activation = 'softmax', name='output_a1')(x)
 angle_2_output = Dense(angle_bin_number, activation = 'softmax', name='output_a2')(x)
@@ -255,57 +290,51 @@ elif using_resnet:
 #               metrics=['accuracy'])
 from keras.optimizers import Adam
 optimizer=Adam(lr=1e-6)
-model.compile(loss='sparse_categorical_crossentropy',
+model.compile(loss='categorical_crossentropy',
               optimizer=optimizer,
               metrics=['accuracy'])
 
 ###training
 
+generator_train = BoxImageGenerator(datamode="train", batch_size=batch_size, image_dir=image_dir_train, training_mode=True)
+generator_val = BoxImageGenerator(datamode="validation", batch_size=batch_size, image_dir=image_dir_val, training_mode=False)
+
+#%% callbacks
+ensure_dir(tensorboard_dir)
+ensure_dir(snapshots_dir)
+#tb_callback = TensorBoard(tensorboard_dir, histogram_freq=0, write_graph=True, write_images=True)
+saver_callback = ModelCheckpoint(os.path.join(snapshots_dir, snapshots_file), period=1)
+terminate = TerminateOnNaN()
 
 
-with open('./record_vehicle_id.txt', 'a+') as file:
-    file.write('start============================================== \n')
+if lr_search:
+    old_model = load_model(latest_model_path)
+    lrf = LearningRateFinder(model)
+    lrf.find(
+        generator_train,
+        1e-8, 1e+1,
+        epochs=1,
+        stepsPerEpoch=len(generator_train),
+        batchSize=48
+    )
 
-for i in range(epochs):
-    generator_train = BoxImageGenerator(datamode="train", batch_size=batch_size, image_dir=image_dir_train)
-    generator_val = BoxImageGenerator(datamode="validation", batch_size=batch_size, image_dir=image_dir_val)
+else:
+    # if continue_train:
+    #     model.load_weights('./model_60bins_resnet_SGD_temp.h5')
+    # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! generator_train", generator_train.n)
+    h = model.fit_generator(generator=generator_train, 
+                        steps_per_epoch= len(generator_train),
+                        epochs=epochs,
+                        verbose=1,
+                        validation_data=generator_val,
+                        validation_steps=len(generator_val),
+                        callbacks=[loss_history, saver_callback, terminate],
+                        initial_epoch = 0, use_multiprocessing=False
+                        )
+                            
+    # history = h.history
 
-    #%% callbacks
-    ensure_dir(tensorboard_dir)
-    ensure_dir(snapshots_dir)
-    #tb_callback = TensorBoard(tensorboard_dir, histogram_freq=0, write_graph=True, write_images=True)
-    # saver_callback = ModelCheckpoint(os.path.join(snapshots_dir, snapshots_file), period=2)
-    terminate = TerminateOnNaN()
-
-
-    if lr_search:
-        old_model = load_model(latest_model_path)
-        lrf = LearningRateFinder(model)
-        lrf.find(
-            generator_train,
-            1e-8, 1e+1,
-            epochs=1,
-            stepsPerEpoch=generator_train.n // batch_size,
-            batchSize=64
-        )
-
-    else:
-        # if continue_train:
-        #     model.load_weights('./model_60bins_resnet_SGD_temp.h5')
-        # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! generator_train", generator_train.n)
-        h = model.fit_generator(generator=generator_train, 
-                            steps_per_epoch= generator_train.n // batch_size,
-                            epochs=epochs,
-                            verbose=1,
-                            validation_data=generator_val,
-                            validation_steps=generator_val.n // batch_size,
-                            callbacks=[loss_history, terminate],
-                            initial_epoch = 0, use_multiprocessing=True
-                            )
-                                
-        # history = h.history
-
-        model.save('./model_angle_and_dimension_60bins_resnet_epoch{}_direction_angle.h5'.format(epochs))
+    model.save('./model_angle_and_dimension_60bins_resnet_epoch{}_direction_angle.h5'.format(epochs))
 
 # with open('./loss_acc_6bins_resnet.json', 'w') as file:
 #     json.dump(total_eval, file, separators=(',', ':'), indent = 4)

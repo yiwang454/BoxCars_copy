@@ -39,7 +39,9 @@ def add_bb_noise_flip(image, bb3d, flip, bb_noise):
     if flip:
         bb3d[:, 0] = image.shape[1] - bb3d[:,0]
         image = cv2.flip(image, 1)
+
     return image, bb3d
+
 
 #%%
 def _unpack_side(img, origPoints, targetSize):

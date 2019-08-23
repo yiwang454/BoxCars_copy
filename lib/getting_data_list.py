@@ -10,8 +10,8 @@ sys.path.insert(0, os.path.realpath(os.path.join(script_dir, '..', 'scripts')))
 
 from config import BOXCARS_LIST_TRAIN, BOXCARS_LIST_VAL, BOXCARS_LIST_TEST
 
-image_dir = '/home/vivacityserver6/datasets/BoxCars116k/ims_train'
-anns_dir = '/home/vivacityserver6/datasets/BoxCars116k/anns_train'
+image_dir = '/home/vivacityserver6/datasets/BoxCars116k/ims_val'
+anns_dir = '/home/vivacityserver6/datasets/BoxCars116k/anns_val'
 separator = ' '
 
 def wirte_list_image_path(mode):
@@ -53,4 +53,4 @@ def get_label_from_image_name(image_name):
 
 
 
-wirte_list_image_path("train")
+wirte_list_image_path("validation")

@@ -138,7 +138,7 @@ def three_normalized_dimensions(bb3d, normal_length = 1):
         L4 = line(bb3d[b[2]], bb3d[b[3]])
         R34 = intersection(L3, L4)
         norm_len = get_length_from_points(R12, R34) / normal_length
-        dimensions.append(floor(norm_len / 0.015))
+        dimensions.append(floor(norm_len / 0.0167))
         #dimensions.append(norm_len)
     
     return dimensions
