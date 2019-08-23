@@ -23,4 +23,5 @@ output
 # C extensions
 *.so
 
-
+#model file
+*.h5
