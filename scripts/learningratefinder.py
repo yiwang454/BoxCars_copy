@@ -39,7 +39,7 @@ class LearningRateFinder:
 	def is_data_iter(self, data):
 		# define the set of class types we will check for
 		iterClasses = ["NumpyArrayIterator", "DirectoryIterator",
-			 "Iterator", "Sequence", "BoxCarsDataGenerator"]
+			 "Iterator", "Sequence", "BoxImageGenerator"]
 		print(data.__class__.__name__)
 		# return whether our data is an iterator
 		return data.__class__.__name__ in iterClasses
@@ -85,7 +85,7 @@ class LearningRateFinder:
 		self.plot_loss()
 
 	def find(self, trainData, startLR, endLR, epochs=None,
-		stepsPerEpoch=None, batchSize=64, sampleSize=2048,
+		stepsPerEpoch=None, batchSize=48, sampleSize=2048,
 		verbose=1):
 		# reset our class-specific variables
 		self.reset()

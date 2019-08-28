@@ -4,14 +4,13 @@ import json
 import _init_paths
 from keras.models import load_model
 
-from boxcars_dataset import BoxCarsDataset
-from boxcars_data_generator import BoxCarsDataGenerator
+from boxcars_datagen import BoxImageGenerator
+from config import output_path, image_dir_test
 
-model_path = '/home/vivacityserver6/repos/BoxCars/cache/snapshots/model_3angles_60bins_resnet_008.h5'
-prediction_saved_path = '/home/vivacityserver6/repos/BoxCars/scripts/predictions_file_with_angle.json'
-batch_size = 64
+model_path = '/home/vivacityserver6/repos/BoxCars/cache/snapshots/model_resnet60_adam015.h5'
+prediction_saved_path = output_path + '/predictions_file_with_angle.json'
+batch_size = 16
 
-estimated_3DBB = None
 estimated_prediction = False
 
 def assigning_evaluation_value(eval_list):
@@ -27,19 +26,14 @@ def evaluation_for_whole_dataset(model, dataset_generator, batch_size):
 def main():
     model = load_model(model_path)
 
-    if estimated_3DBB == None:
-        dataset = BoxCarsDataset(load_split="hard", load_atlas=True)
-    else:
-        dataset = BoxCarsDataset(load_split="hard", load_atlas=True, 
-                                use_estimated_3DBB = True, estimated_3DBB_path = estimated_3DBB)
-
-    dataset.initialize_data('test')
-
-    generator_test = BoxCarsDataGenerator(dataset, "test", batch_size, training_mode=False)
+    #loading boxcar generator
+    generator_test = BoxImageGenerator("test", batch_size, image_dir_test)
 
     if estimated_prediction == False:
         evaluation = evaluation_for_whole_dataset(model, generator_test, batch_size)
         print(evaluation)
+        with open(prediction_saved_path, 'w+') as json_file:
+            json.dump(evaluation, json_file, indent=4)
 
     else:
         with open(prediction_saved_path, 'r') as json_file:

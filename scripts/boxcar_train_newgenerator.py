@@ -7,53 +7,25 @@ from learningratefinder import LearningRateFinder
 from boxcars_datagen import BoxImageGenerator
 
 import keras
+from keras import backend as K
 from keras.models import Sequential, Model, load_model
-from keras.layers import Input, Dense, Activation,Conv2D, MaxPooling2D, BatchNormalization, Flatten, LeakyReLU
+from keras.layers import Input, Dense, Activation, Conv2D, MaxPooling2D, BatchNormalization, Flatten, LeakyReLU
 from keras.applications.resnet50 import ResNet50
 from keras.optimizers import Adadelta, SGD
+from keras.regularizers import l2
 from keras.callbacks import ModelCheckpoint, TensorBoard, LambdaCallback, TerminateOnNaN
 
 import matplotlib.pyplot as plt
+from config import *
 
-batch_size = 48
-epochs = 60
-direction_number = 2
-angle_bin_number = 60
-angle_number = 3
-dimension_bin_number = 60
-dimension_number = 3
-input_shape = (224, 224, 3)
-estimated_3DBB = None
-using_VGG = False
-using_resnet = True
-continue_train = False
-cache = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "cache"))
-snapshots_file = "model_resnet60_adam{epoch:03d}.h5"
 latest_model_path = ""
-output_path = "./output_classic_setting"
-if not os.path.exists(output_path):
-    os.mkdir(output_path)
-angle_fig_file = output_path + "/loss_acc_3angles_60bins_resnet.png"
-dimension_fig_file = output_path + "/loss_acc_3dimesnions_60bins_resnet.png"
-
-loss_fig = output_path + "/loss_60bins_resnet_adam.png"
-losses_fig = output_path + "/losses_60bins_resnet_adam.png"
-acc_fig = output_path + "/acc_60bins_resnet_adam.png"
-val_loss_fig = output_path + "/valloss_60bins_resnet_adam.png"
-val_losses_fig = output_path + "/vallosses_60bins_resnet_adam.png"
-
-lr_search = False
-
-image_dir_train = '/home/vivacityserver6/datasets/BoxCars116k/ims_train'
-anns_dir_train = '/home/vivacityserver6/datasets/BoxCars116k/anns_train'
-image_dir_val = '/home/vivacityserver6/datasets/BoxCars116k/ims_val'
 
 class LossHistory(keras.callbacks.Callback):
     def on_train_begin(self, logs={}):
-        self.labels = ['loss', 'output_d_loss', 'output_a0_loss', 'output_dim0_loss', 'output_d_acc', ' output_a0_acc', 'output_dim0_acc']
+        self.labels = ['loss', 'output_d_loss', 'output_a0_loss', 'output_dim0_loss', 'output_d_acc', 'output_a0_acc', 'output_dim0_acc']
         self.losses = [[] for _ in range(len(self.labels))]
 
-        self.epoch_labels = ['loss', 'val_loss', 'val_output_d_loss', 'val_output_a0_loss', 'val_output_dim0_loss', 'val_output_d_acc', 'val_output_a0_acc', 'val_output_d0_acc']
+        self.epoch_labels = ['loss', 'val_loss', 'val_output_d_loss', 'val_output_a0_loss', 'val_output_dim0_loss', 'val_output_d_acc', 'val_output_a0_acc', 'val_output_dim0_acc']
         self.epoch_logs = [[] for _ in range(len(self.epoch_labels))]
 
         self.batch_period = 100
@@ -82,7 +54,7 @@ class LossHistory(keras.callbacks.Callback):
         plt.clf()
 
         plt.plot(batch_list, self.losses[1], 'b-', label=self.labels[1], linewidth=1)
-        plt.plot(batch_list, self.losses[2], 'g-', label=self.labels[2], linewidth=1)
+        plt.plot(batch_list, self.losses[2], 'k-', label=self.labels[2], linewidth=1)
         plt.plot(batch_list, self.losses[3], 'y-', label=self.labels[3], linewidth=1)
             
         plt.xlabel("batches")
@@ -93,7 +65,7 @@ class LossHistory(keras.callbacks.Callback):
         plt.clf()      
 
         plt.plot(batch_list, self.losses[4], 'b--', label=self.labels[4], linewidth=1)
-        plt.plot(batch_list, self.losses[5], 'g--', label=self.labels[5], linewidth=1)
+        plt.plot(batch_list, self.losses[5], 'k--', label=self.labels[5], linewidth=1)
         plt.plot(batch_list, self.losses[6], 'y--', label=self.labels[6], linewidth=1)
             
         plt.xlabel("batches")
@@ -121,7 +93,7 @@ class LossHistory(keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs={}):
         epoch_history = {'epoch': epoch, 'logs': logs}
-        with open('./train_history.json', 'w+') as file:
+        with open(output_path + '/train_history.json', 'a+') as file:
             json.dump(epoch_history, file, indent=4)
         
         for idx, loss in enumerate(self.epoch_logs):
@@ -133,30 +105,31 @@ class LossHistory(keras.callbacks.Callback):
         plt.plot(epoch_list, self.epoch_logs[0], 'r-', label=self.epoch_labels[0], linewidth=2)
         plt.plot(epoch_list, self.epoch_logs[1], 'r--', label=self.epoch_labels[1], linewidth=1)
 
-        plt.xlabel("batches")
+        plt.xlabel("epochs")
         plt.ylabel("Loss")
         plt.legend()
 
         plt.savefig(val_loss_fig)
         plt.clf()
 
-        for idx, linestyle in zip([2, 3, 4, 5, 6, 7], ['b-', 'g-', 'y-', 'b--', 'g--', 'y--']):
+        for idx, linestyle in zip([2, 3, 4, 5, 6, 7], ['b-', 'k-', 'y-', 'b--', 'k--', 'y--']):
             plt.plot(epoch_list, self.epoch_logs[idx], linestyle, label=self.epoch_labels[idx], linewidth=1)
-            
-        plt.xlabel("batches")
+
+              
+        plt.xlabel("epochs")
         plt.ylabel("Accuracy and loss")
         plt.legend()
 
         plt.savefig(val_losses_fig)
         plt.clf()      
 
+        with open(output_path + '/learning_rate.json', 'a+') as file:
+            file.write(str(K.get_value(self.model.optimizer.lr)) + '\n')
 
         if (epoch+1) % 15 == 0:
             print('epoch: ', epoch, 'changing learning rate')
             current_lr = K.get_value(self.model.optimizer.lr)
-            K.set_value(self.model.optimizer.lr, current_lr * 0.1)
-     
-
+            K.set_value(self.model.optimizer.lr, current_lr * 10)
 
         
 
@@ -247,6 +220,57 @@ def VGG_model():
     # model_main.add(BatchNormalization())
     return model_main
 
+def resnet_layer(inputs,
+                 num_filters=16,
+                 kernel_size=3,
+                 strides=1,
+                 activation='relu',
+                 batch_normalization=True,
+                 conv_first=True):
+    """2D Convolution-Batch Normalization-Activation stack builder
+
+    # Arguments
+        inputs (tensor): input tensor from input image or previous layer
+        num_filters (int): Conv2D number of filters
+        kernel_size (int): Conv2D square kernel dimensions
+        strides (int): Conv2D square stride dimensions
+        activation (string): activation name
+        batch_normalization (bool): whether to include batch normalization
+        conv_first (bool): conv-bn-activation (True) or
+            bn-activation-conv (False)
+
+    # Returns
+        x (tensor): tensor as input to the next layer
+    """
+    conv = Conv2D(num_filters,
+                  kernel_size=kernel_size,
+                  strides=strides,
+                  padding='same',
+                  kernel_initializer='he_normal',
+                  kernel_regularizer=l2(1e-4))
+
+    x = inputs
+    if conv_first:
+        x = conv(x)
+        if batch_normalization:
+            x = BatchNormalization()(x)
+        if activation is not None:
+            x = Activation(activation)(x)
+    else:
+        if batch_normalization:
+            x = BatchNormalization()(x)
+        if activation is not None:
+            x = Activation(activation)(x)
+        x = conv(x)
+    return x
+
+def extra_layer(x):
+    y = resnet_layer(x)
+    y = resnet_layer(y)
+    y = resnet_layer(y)
+    return Flatten()(y)
+
+
 snapshots_dir = os.path.join(cache, "snapshots")
 tensorboard_dir = os.path.join(cache, "tensorboard")
 loss_history = LossHistory()
@@ -258,19 +282,20 @@ if using_VGG:
     x = model_main(main_input)
 elif using_resnet:
     model_main = ResNet50(weights='imagenet', include_top=False, input_shape=(224,224,3))
-    x = Flatten()(model_main.output)
+    x = model_main.output
+    flat_x = Flatten()(x)
     
-direction_output = Dense(direction_number, activation = 'softmax', name='output_d')(x)
+direction_output = Dense(direction_number, activation = 'softmax', name='output_d')(flat_x)
 
 # angle_0_output_previous = Dense(500, activation="relu")(x)
 
-angle_0_output = Dense(angle_bin_number, activation = 'softmax', name='output_a0')(x)
-angle_1_output = Dense(angle_bin_number, activation = 'softmax', name='output_a1')(x)
-angle_2_output = Dense(angle_bin_number, activation = 'softmax', name='output_a2')(x)
+angle_0_output = Dense(angle_bin_number, activation = 'softmax', name='output_a0')(flat_x)
+angle_1_output = Dense(angle_bin_number, activation = 'softmax', name='output_a1')(flat_x)
+angle_2_output = Dense(angle_bin_number, activation = 'softmax', name='output_a2')(flat_x)
 
-dimension_0_output = Dense(dimension_bin_number, activation = 'softmax', name='output_dim0')(x)
-dimension_1_output = Dense(dimension_bin_number, activation = 'softmax', name='output_dim1')(x)
-dimension_2_output = Dense(dimension_bin_number, activation = 'softmax', name='output_dim2')(x)
+dimension_0_output = Dense(dimension_bin_number, activation = 'softmax', name='output_dim0')(extra_layer(x))
+dimension_1_output = Dense(dimension_bin_number, activation = 'softmax', name='output_dim1')(extra_layer(x))
+dimension_2_output = Dense(dimension_bin_number, activation = 'softmax', name='output_dim2')(extra_layer(x))
 
 output_list = [direction_output, 
                angle_0_output, 
@@ -342,6 +367,3 @@ else:
 # with open('./loss_acc_6bins_resnet.json', 'w') as file:
 #     json.dump(total_eval, file, separators=(',', ':'), indent = 4)
 
-'''
-previous plot code
-'''

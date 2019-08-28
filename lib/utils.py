@@ -281,5 +281,6 @@ def image_preprocess(im):
     offset_x = (desired_size-new_size[1])//2
     offset_y = (desired_size-new_size[0])//2
     new_im[offset_y: offset_y + new_size[0], offset_x: offset_x + new_size[1]] = im
-    
+    new_im = (new_im.astype(np.float32))/255.
+
     return new_im

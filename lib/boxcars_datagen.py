@@ -14,15 +14,14 @@ sys.path.insert(0, os.path.realpath(os.path.join(script_dir, '..', 'scripts')))
 
 from keras.utils import to_categorical
 from config import BOXCARS_LIST_TRAIN, BOXCARS_LIST_VAL, BOXCARS_LIST_TEST
-# 
+
 class BoxImageGenerator(keras.utils.Sequence):
-    def __init__(self, datamode, batch_size, image_dir ,image_size=(224, 224), training_mode=False, shuffle = True, diff_normalize=False):
+    def __init__(self, datamode, batch_size, image_dir ,image_size=(224, 224), training_mode=False, shuffle = True):
         self.batch_size = batch_size
         self.separator = ' '
         self.image_dir = image_dir
         self.training_mode = training_mode
         self.shuffle = shuffle
-        self.diff_normalize = diff_normalize
 
         if datamode == "train":
             self.list_image_file = BOXCARS_LIST_TRAIN
@@ -75,10 +74,7 @@ class BoxImageGenerator(keras.utils.Sequence):
             #     bb_noise = None
             #     flip = bool(random.getrandbits(1)) # random flip
             #     # image = add_bb_noise_flip(image, bb3d, flip, bb_noise)
-            if not self.diff_normalize:
-                image = (image.astype(np.float32) - 116)/128.
-            else:
-                image = (image.astype(np.float32))/255.
+            
             # print(image.shape)
 
             x[j, ...] = image

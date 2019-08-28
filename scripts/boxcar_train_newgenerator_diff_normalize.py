@@ -7,6 +7,7 @@ from learningratefinder import LearningRateFinder
 from boxcars_datagen import BoxImageGenerator
 
 import keras
+from keras import backend as K
 from keras.models import Sequential, Model, load_model
 from keras.layers import Input, Dense, Activation,Conv2D, MaxPooling2D, BatchNormalization, Flatten, LeakyReLU
 from keras.applications.resnet50 import ResNet50
@@ -28,9 +29,9 @@ using_VGG = False
 using_resnet = True
 continue_train = False
 cache = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "cache"))
-snapshots_file = "model_resnet60_adam_diff_normalize{epoch:03d}.h5"
-latest_model_path = ""
-output_path = "./output_diff_normalize"
+snapshots_file = "model_resnet60_adam_manual_lr{epoch:03d}.h5"
+latest_model_path = "/home/vivacityserver6/repos/BoxCars/cache/snapshots/model_resnet60_adam015.h5"
+output_path = "./output_manual_lr"
 if not os.path.exists(output_path):
     os.mkdir(output_path)
 angle_fig_file = output_path + "/loss_acc_3angles_60bins_resnet.png"
@@ -42,10 +43,9 @@ acc_fig = output_path + "/acc_60bins_resnet_adam.png"
 val_loss_fig = output_path + "/valloss_60bins_resnet_adam.png"
 val_losses_fig = output_path + "/vallosses_60bins_resnet_adam.png"
 
-lr_search = False
+lr_search = True
 
 image_dir_train = '/home/vivacityserver6/datasets/BoxCars116k/ims_train'
-anns_dir_train = '/home/vivacityserver6/datasets/BoxCars116k/anns_train'
 image_dir_val = '/home/vivacityserver6/datasets/BoxCars116k/ims_val'
 
 class LossHistory(keras.callbacks.Callback):
@@ -119,42 +119,42 @@ class LossHistory(keras.callbacks.Callback):
     def on_epoch_begin(self, epoch, logs={}):
         self.epoch_number = epoch
 
-    def on_epoch_end(self, epoch, logs={}):
-        epoch_history = {'epoch': epoch, 'logs': logs}
-        with open('./train_history.json', 'w+') as file:
-            json.dump(epoch_history, file, indent=4)
+     def on_epoch_end(self, epoch, logs={}):
+         epoch_history = {'epoch': epoch, 'logs': logs}
+         with open('./manual_lr_train_history.json', 'w+') as file:
+             json.dump(epoch_history, file, indent=4)
         
-        for idx, loss in enumerate(self.epoch_logs):
-            loss.append(logs.get(self.epoch_labels[idx]))
+         for idx, loss in enumerate(self.epoch_logs):
+             loss.append(logs.get(self.epoch_labels[idx]))
 
-        epoch_list = list(range(epoch + 1))
-        logs.get(self.epoch_labels[idx])
+         epoch_list = list(range(epoch + 1))
+         logs.get(self.epoch_labels[idx])
 
-        plt.plot(epoch_list, self.epoch_logs[0], 'r-', label=self.epoch_labels[0], linewidth=2)
-        plt.plot(epoch_list, self.epoch_logs[1], 'r--', label=self.epoch_labels[1], linewidth=1)
+         plt.plot(epoch_list, self.epoch_logs[0], 'r-', label=self.epoch_labels[0], linewidth=2)
+         plt.plot(epoch_list, self.epoch_logs[1], 'r--', label=self.epoch_labels[1], linewidth=1)
 
-        plt.xlabel("batches")
-        plt.ylabel("Loss")
-        plt.legend()
+         plt.xlabel("epochs")
+         plt.ylabel("Loss")
+         plt.legend()
 
-        plt.savefig(val_loss_fig)
-        plt.clf()
+         plt.savefig(val_loss_fig)
+         plt.clf()
 
-        for idx, linestyle in zip([2, 3, 4, 5, 6, 7], ['b-', 'g-', 'y-', 'b--', 'g--', 'y--']):
-            plt.plot(epoch_list, self.epoch_logs[idx], linestyle, label=self.epoch_labels[idx], linewidth=1)
+         for idx, linestyle in zip([2, 3, 4, 5, 6, 7], ['b-', 'g-', 'y-', 'b--', 'g--', 'y--']):
+             plt.plot(epoch_list, self.epoch_logs[idx], linestyle, label=self.epoch_labels[idx], linewidth=1)
             
-        plt.xlabel("batches")
-        plt.ylabel("Accuracy and loss")
-        plt.legend()
+         plt.xlabel("epochs")
+         plt.ylabel("Accuracy and loss")
+         plt.legend()
 
-        plt.savefig(val_losses_fig)
-        plt.clf()      
+         plt.savefig(val_losses_fig)
+         plt.clf()      
 
 
-        if (epoch+1) % 15 == 0:
-            print('epoch: ', epoch, 'changing learning rate')
-            current_lr = K.get_value(self.model.optimizer.lr)
-            K.set_value(self.model.optimizer.lr, current_lr * 0.1)
+         if (epoch+1) % 15 == 0:
+             print('epoch: ', epoch, 'changing learning rate')
+             current_lr = K.get_value(self.model.optimizer.lr)
+             K.set_value(self.model.optimizer.lr, current_lr * 0.1)
      
 
 
@@ -299,8 +299,8 @@ model.compile(loss='categorical_crossentropy',
 
 ###training
 
-generator_train = BoxImageGenerator(datamode="train", batch_size=batch_size, image_dir=image_dir_train, training_mode=True, diff_normalize=True)
-generator_val = BoxImageGenerator(datamode="validation", batch_size=batch_size, image_dir=image_dir_val, training_mode=False, diff_normalize=True)
+generator_train = BoxImageGenerator(datamode="train", batch_size=batch_size, image_dir=image_dir_train, training_mode=True)
+generator_val = BoxImageGenerator(datamode="validation", batch_size=batch_size, image_dir=image_dir_val, training_mode=False)
 
 #%% callbacks
 ensure_dir(tensorboard_dir)
@@ -315,9 +315,9 @@ if lr_search:
     lrf = LearningRateFinder(model)
     lrf.find(
         generator_train,
-        1e-8, 1e+1,
+        1e-11, 1,
         epochs=1,
-        stepsPerEpoch=len(generator_train),
+        stepsPerEpoch=100,
         batchSize=48
     )
 
